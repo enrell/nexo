@@ -1,0 +1,99 @@
+{
+  "name": "nexo",
+  "private": true,
+  "version": "0.2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k -n vite,electron \"vite\" \"wait-on tcp:1420 && cross-env NEXO_DEV=1 electron .\"",
+    "dev:web": "vite",
+    "build": "tsc && vite build",
+    "start": "npm run build && electron .",
+    "icons": "electron scripts/make-icons.cjs",
+    "test:e2e": "npm run build && node tests/e2e.mjs",
+    "dist": "npm run build && electron-builder --win --publish never",
+    "release": "npm run build && electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "uiohook-napi": "^1.5.5"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^10.0.6",
+    "cross-env": "^10.1.0",
+    "electron": "^44.9.0",
+    "electron-builder": "^26.15.3",
+    "playwright-core": "^1.64.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "trystero": "^0.26.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16",
+    "wait-on": "^9.5.1"
+  },
+  "allowScripts": {
+    "electron@44.9.0": true,
+    "electron-winstaller@5.4.0": true,
+    "uiohook-napi": false
+  },
+  "main": "electron/main.cjs",
+  "description": "Chat, voz e lives P2P entre amigos",
+  "author": "enrell",
+  "build": {
+    "appId": "com.nexo.app",
+    "productName": "Nexo",
+    "artifactName": "Nexo-Setup-${version}.${ext}",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**",
+      "electron/**",
+      "build/icon.png",
+      "build/tray*.png",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/uiohook-napi/**"
+    ],
+    "protocols": [
+      {
+        "name": "Convite do Nexo",
+        "schemes": [
+          "nexo"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nexo",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "enrell",
+        "repo": "nexo",
+        "releaseType": "release"
+      }
+    ]
+  }
+}
