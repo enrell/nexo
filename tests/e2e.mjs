@@ -94,9 +94,16 @@ try {
   });
 
   const B = await launch("Bob");
-  await step("convidado entra, handshake assinado e histórico sincroniza", async () => {
+  await step("convidado fica na porta até um admin aprovar (seguro por padrão)", async () => {
     await joinWithCode(B, code);
-    await wait(B, () => Object.values(window.__nexo.session?.peers ?? {}).some((p) => p.profile), null, 60000);
+    await B.page.getByText("Aguardando aprovação").waitFor({ timeout: 60000 });
+    const leaked = await B.ev(() => window.__nexo.session.events.size);
+    if (leaked > 0) throw new Error("pendente recebeu " + leaked + " eventos antes da aprovação");
+    await A.page.locator(".banner.warn").waitFor({ timeout: 15000 });
+    await A.page.locator(".member.pending").getByRole("button", { name: "Aprovar" }).click();
+  });
+
+  await step("aprovado: handshake assinado, histórico sincroniza", async () => {
     await B.page.getByText("primeira mensagem").waitFor({ timeout: 20000 });
     await B.page.locator("strong", { hasText: "terceira" }).waitFor({ timeout: 10000 });
     await wait(A, () => document.querySelectorAll(".msg.pending").length === 0, null, 15000);
@@ -147,13 +154,27 @@ try {
   });
 
   const C = await launch("Carol");
-  await step("terceiro membro chega depois e recebe o histórico completo", async () => {
+  await step("terceiro membro chega depois, é aprovado e recebe o histórico completo", async () => {
     await joinWithCode(C, code);
+    await C.page.getByText("Aguardando aprovação").waitFor({ timeout: 60000 });
+    await A.page.locator(".member.pending").getByRole("button", { name: "Aprovar" }).click();
     await wait(C, () => Object.values(window.__nexo.session?.peers ?? {}).filter((p) => p.profile).length >= 2, null, 60000);
     await wait(B, () => Object.values(window.__nexo.session?.peers ?? {}).filter((p) => p.profile).length >= 2, null, 60000);
     const countA = await sessionEval(A, (s) => s.events.size);
     await wait(C, (n) => window.__nexo.session.events.size >= n, countA, 20000);
     await wait(C, () => !!document.querySelector(".att-image img"), null, 20000);
+  });
+
+  await step("intermediário com certificado DTLS diferente do assinado é recusado", async () => {
+    const M = await launch("Mallory");
+    await M.ev(() => window.__nexoLib.testOverrideFingerprint("AB".repeat(32)));
+    await joinWithCode(M, code);
+    await M.page.waitForTimeout(15000);
+    const seenByA = await A.ev(() => Object.values(window.__nexo.session.peers).some((p) => p.profile?.name === "Mallory"));
+    const mPeers = await peers(M);
+    await M.appl.close();
+    delete apps.Mallory;
+    if (seenByA || mPeers > 0) throw new Error(`conexão aceita (A vê Mallory: ${seenByA}, Mallory vê ${mPeers})`);
   });
 
   await step("voz entre três pessoas (microfone falso)", async () => {
@@ -203,6 +224,7 @@ try {
   await step("quem caiu reabre o app: identidade e histórico persistem", async () => {
     const R = await launch(relayer.name, { fresh: false });
     relayer = R;
+    await wait(R, () => window.__nexo.session?.loaded === true, null, 20000);
     const n = await sessionEval(R, (s) => s.events.size);
     if (n < 8) throw new Error("histórico não persistiu: " + n);
     await wait(R, () => Object.values(window.__nexo.session?.peers ?? {}).filter((p) => p.profile).length >= 2, null, 60000);
@@ -237,6 +259,51 @@ try {
     await wait(bob, () => Object.values(window.__nexo.session?.peers ?? {}).some((p) => p.profile?.name === "Alice"), null, 60000);
     await send(bob, "cheguei na sala nova");
     await A.page.getByText("cheguei na sala nova").waitFor({ timeout: 15000 });
+  });
+
+  await step("nada fica em texto puro no disco (localStorage e IndexedDB cifrados)", async () => {
+    const res = await A.ev(async () => {
+      const plain = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        const v = localStorage.getItem(k);
+        if (k.startsWith("nexo:") && !v.startsWith("v1:")) plain.push(k);
+      }
+      const db = await new Promise((r, j) => {
+        const q = indexedDB.open("nexo-secure");
+        q.onsuccess = () => r(q.result);
+        q.onerror = () => j(q.error);
+      });
+      const rows = await new Promise((r) => {
+        const q = db.transaction("events").objectStore("events").getAll();
+        q.onsuccess = () => r(q.result);
+      });
+      const dec = new TextDecoder();
+      const leaks = rows.filter((row) => /mensagem|cheguei|imagem/.test(dec.decode(row.d)) || "b" in row || "s" in row).length;
+      return { plain, rows: rows.length, leaks };
+    });
+    if (res.plain.length) throw new Error("chaves em texto puro: " + res.plain.join(","));
+    if (!res.rows || res.leaks) throw new Error(`eventos: ${res.rows}, vazando texto: ${res.leaks}`);
+  });
+
+  await step("backup da conta: cifrado com senha, senha errada é recusada", async () => {
+    const out = await A.ev(async () => {
+      const app = window.__nexo;
+      const text = await app.identity.exportBackup("senha-de-teste-forte", { profile: app.profile });
+      const obj = JSON.parse(text);
+      let wrongRejected = false;
+      try {
+        await window.__nexoLib.openBackup(text, "senha-errada-qualquer");
+      } catch {
+        wrongRejected = true;
+      }
+      const ok = await window.__nexoLib.openBackup(text, "senha-de-teste-forte");
+      return { hasPlainKey: text.includes("jwk") || text.includes(app.identity.pub), iterations: obj.iterations, wrongRejected, samePub: ok.identity.pub === app.identity.pub };
+    });
+    if (out.hasPlainKey) throw new Error("backup contém dados em texto puro");
+    if (out.iterations < 600000) throw new Error("PBKDF2 fraco");
+    if (!out.wrongRejected) throw new Error("senha errada foi aceita");
+    if (!out.samePub) throw new Error("backup não restaura a mesma identidade");
   });
 
   await step("configurações e troca rápida (Ctrl+K) abrem", async () => {

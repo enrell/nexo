@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { useApp } from "../lib/app";
 import { selfId, type LiveStats, type Session } from "../lib/session";
+import { storage } from "../lib/storage";
 import { ChatView } from "./Chat";
 import { Avatar, Icons, MediaView } from "./common";
 
-const VOL_KEY = "nexo:livevol";
+const VOL_KEY = "livevol";
 
 export function LiveView({ s, origin }: { s: Session; origin: string }) {
   const a = useApp();
   const mine = origin === selfId;
   const live = mine ? s.myLive : s.peers[origin]?.live;
-  const [volume, setVolume] = useState(() => Number(localStorage.getItem(VOL_KEY) ?? 1));
+  const [volume, setVolume] = useState(() => storage.get<number>(VOL_KEY, 1));
   const [chatOpen, setChatOpen] = useState(true);
   const [showStats, setShowStats] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
@@ -29,7 +30,7 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
   }, [showStats, mine, s]);
 
   useEffect(() => {
-    localStorage.setItem(VOL_KEY, String(volume));
+    storage.set(VOL_KEY, volume);
   }, [volume]);
 
   // atalhos: F = tela cheia, T = modo teatro, M = mudo

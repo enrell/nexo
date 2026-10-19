@@ -226,7 +226,18 @@ function ChannelBell({ s, channelId }: { s: Session; channelId: string }) {
 }
 
 function ConnectionBanner({ s, peersOnline }: { s: Session; peersOnline: number }) {
+  const a = useApp();
   if (s.joinError) return <div className="banner error">⚠ {s.joinError}</div>;
+  const pending = s.isAdmin() ? s.pendingPeers() : [];
+  if (pending.length)
+    return (
+      <div className="banner warn">
+        🚪 {pending.length === 1 ? `${s.profileOf(pending[0][1].pub).name} está pedindo para entrar.` : `${pending.length} pessoas estão pedindo para entrar.`}
+        <button className="btn small" onClick={() => !a.showMembers && a.toggleMembers()}>
+          Ver pedidos
+        </button>
+      </div>
+    );
   if (!s.loaded) return <div className="banner">Carregando histórico…</div>;
   if (peersOnline === 0)
     return (
@@ -802,6 +813,15 @@ function useBlobUrl(s: Session, att: Attachment) {
   return { url, loading };
 }
 
+/** Extensões que executam código no Windows: pedimos confirmação antes de salvar. */
+const DANGEROUS = /\.(exe|com|bat|cmd|scr|pif|msi|msix|msp|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|cpl|jar|lnk|reg|dll|sys|appx|appxbundle|iso|img|vhd|vhdx|url|scf|chm|inf)$/i;
+
+function guardDownload(e: React.MouseEvent, name: string) {
+  if (DANGEROUS.test(name) && !confirm(`"${name}" é um arquivo que pode executar programas no seu PC.
+
+Só abra se você confia em quem mandou e esperava esse arquivo. Salvar mesmo assim?`)) e.preventDefault();
+}
+
 function AttachmentView({ s, att, author }: { s: Session; att: Attachment; author: string }) {
   const { url, loading } = useBlobUrl(s, att);
   const isImage = att.mime.startsWith("image/");
@@ -843,7 +863,7 @@ function AttachmentView({ s, att, author }: { s: Session; att: Attachment; autho
       <Icons.File size={32} />
       <div className="att-file-info">
         {url ? (
-          <a href={url} download={att.name} className="ellipsis">
+          <a href={url} download={att.name} className={"ellipsis" + (DANGEROUS.test(att.name) ? " danger-text" : "")} onClick={(e) => guardDownload(e, att.name)}>
             {att.name}
           </a>
         ) : (
@@ -852,7 +872,7 @@ function AttachmentView({ s, att, author }: { s: Session; att: Attachment; autho
         <span className="dim small">{formatBytes(att.size)}</span>
       </div>
       {url ? (
-        <a className="icon-btn" href={url} download={att.name} title="Salvar">
+        <a className="icon-btn" href={url} download={att.name} title="Salvar" onClick={(e) => guardDownload(e, att.name)}>
           <Icons.Download />
         </a>
       ) : loading ? (

@@ -2,6 +2,7 @@ import { app, useApp } from "../lib/app";
 import { selfId, type Session } from "../lib/session";
 import { Avatar, Icons, STATUS_LABEL, lastSeenLabel } from "./common";
 import { openMenu, type MenuItem } from "./ContextMenu";
+import { openSafety } from "./Safety";
 
 function VolumeSlider({ pub }: { pub: string }) {
   const a = useApp();
@@ -39,7 +40,12 @@ export function memberMenu(s: Session, pub: string): MenuItem[] {
       }
     },
   });
+  if (!me) items.push({ label: "Verificar identidade", onClick: () => openSafety(s, pub), icon: <Icons.Shield size={16} /> });
   items.push({ label: "Copiar ID do usuário", onClick: () => navigator.clipboard.writeText(pub), icon: <Icons.Copy size={16} /> });
+  if (!me && s.isAdmin() && !s.isMember(pub) && !s.state.banned.has(pub)) {
+    items.push({ sep: true });
+    items.push({ label: "Aprovar entrada", onClick: () => s.admit(pub, true), icon: <Icons.Shield size={16} /> });
+  }
   if (!me && s.isOwner()) {
     const isAdm = s.state.admins.has(pub);
     items.push({ sep: true });
@@ -62,14 +68,15 @@ export function Members({ s }: { s: Session }) {
   const a = useApp();
   const me = a.effectiveProfile();
   type Row = { pub: string; peerId: string; name: string; color: string; avatar?: string; status: "online" | "idle" | "dnd" | "offline"; live: boolean; voice: boolean; rtt?: number; relayed?: boolean; lastSeen?: number };
+  const pending = s.isAdmin() ? s.pendingPeers() : [];
   const online: Row[] = [
     { pub: s.me, peerId: selfId, name: me.name, color: me.color, avatar: me.avatar, status: me.status, live: !!s.myLive, voice: s.inVoice },
     ...Object.entries(s.peers)
-      .filter(([, p]) => p.profile)
+      .filter(([, p]) => p.profile && s.isMember(p.pub))
       .map(([id, p]) => ({
         pub: p.pub,
         peerId: id,
-        name: p.profile!.name,
+        name: s.profileOf(p.pub).name,
         color: p.profile!.color,
         avatar: p.profile!.avatar,
         status: p.profile!.status,
@@ -81,9 +88,9 @@ export function Members({ s }: { s: Session }) {
   ];
   const onlineKeys = new Set(online.map((r) => r.pub));
   const offline: Row[] = Object.values(s.members)
-    .filter((m) => !onlineKeys.has(m.pub) && !s.state.banned.has(m.pub))
+    .filter((m) => !onlineKeys.has(m.pub) && s.isMember(m.pub))
     .sort((x, y) => y.lastSeen - x.lastSeen)
-    .map((m) => ({ pub: m.pub, peerId: "", name: m.name, color: m.color, avatar: m.avatar, status: "offline", live: false, voice: false, lastSeen: m.lastSeen }));
+    .map((m) => ({ pub: m.pub, peerId: "", name: s.profileOf(m.pub).name, color: m.color, avatar: m.avatar, status: "offline", live: false, voice: false, lastSeen: m.lastSeen }));
 
   const role = (pub: string) => (s.isOwner(pub) ? "owner" : s.server.owner && s.state.admins.has(pub) ? "admin" : null);
   const admins = online.filter((r) => role(r.pub));
@@ -128,6 +135,34 @@ export function Members({ s }: { s: Session }) {
 
   return (
     <aside className="members">
+      {pending.length > 0 && (
+        <>
+          <div className="section-title pending-title">
+            <span>Pedindo para entrar — {pending.length}</span>
+          </div>
+          {pending.map(([id, p]) => (
+            <div key={id} className="member pending" onContextMenu={(e) => openMenu(e, memberMenu(s, p.pub))}>
+              <Avatar name={p.profile!.name} color={p.profile!.color} src={p.profile!.avatar} size={32} />
+              <div className="member-info">
+                <div className="member-name">
+                  <span className="ellipsis">{s.profileOf(p.pub).name}</span>
+                </div>
+                <div className="pending-actions">
+                  <button className="btn small" onClick={() => s.admit(p.pub, true)}>
+                    Aprovar
+                  </button>
+                  <button className="btn ghost small" onClick={() => confirm(`Recusar e banir ${p.profile!.name}?`) && s.admit(p.pub, false)}>
+                    Recusar
+                  </button>
+                  <button className="icon-btn tiny" title="Verificar identidade" onClick={() => openSafety(s, p.pub)}>
+                    <Icons.Shield size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
       {admins.length > 0 && (
         <>
           <div className="section-title">

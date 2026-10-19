@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { AudioEngine } from "./audio";
 import { db } from "./db";
-import { Identity } from "./identity";
-import { mediaErrorMessage } from "./rtc";
+import { Identity, openBackup } from "./identity";
+import { initCertificate, mediaErrorMessage, testOverrideFingerprint } from "./rtc";
 import { Session } from "./session";
-import { decodeInvite, randomId, storage } from "./storage";
+import { decodeInvite, defaultSettings, flushSecureStore, initSecureStore, randomId, storage } from "./storage";
+import { initVault } from "./vault";
 import type { MsgView, Profile, ServerInfo, Settings, Status } from "./types";
 
 export type View = { type: "chat" } | { type: "live"; origin: string };
@@ -14,20 +15,22 @@ export const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length
 
 class App {
   ready = false;
+  /** erro irrecuperável na abertura (ex.: cofre de chaves ilegível) */
+  fatal: string | null = null;
   identity!: Identity;
   profile: Profile | null = null;
-  settings: Settings = storage.loadSettings();
-  servers: ServerInfo[] = storage.loadServers();
+  settings: Settings = { ...defaultSettings };
+  servers: ServerInfo[] = [];
   sessions = new Map<string, Session>();
   activeRoom: string | null = null;
-  activeChannel: Record<string, string> = storage.get<Record<string, string>>("activeChannel", {});
+  activeChannel: Record<string, string> = {};
   view: View = { type: "chat" };
   theater = false;
-  showMembers = storage.get<boolean>("showMembers", true);
+  showMembers = true;
   unread: Record<string, number> = {};
   mentions: Record<string, number> = {};
   /** última mensagem lida por canal (para o divisor "novas mensagens") */
-  lastRead: Record<string, number> = storage.get<Record<string, number>>("lastRead", {});
+  lastRead: Record<string, number> = {};
   muted = false;
   deafened = false;
   autoIdle = false;
@@ -49,10 +52,22 @@ class App {
 
   private async init() {
     try {
+      // 1) chave do cofre (protegida pelo Windows) → 2) dados locais decifrados → 3) identidade → 4) certificado DTLS
+      await initVault();
+      await initSecureStore();
+      this.settings = storage.loadSettings();
+      this.servers = storage.loadServers();
+      this.activeChannel = storage.get<Record<string, string>>("activeChannel", {});
+      this.lastRead = storage.get<Record<string, number>>("lastRead", {});
+      this.showMembers = storage.get<boolean>("showMembers", true);
+      this.audio.loadPrefs();
       this.identity = await Identity.load();
+      await initCertificate();
     } catch (e) {
       console.error(e);
-      this.showToast("Seu sistema não suporta Ed25519 — atualize o app.", "error");
+      this.fatal = e instanceof Error ? e.message : String(e);
+      this.ready = true;
+      this.emit();
       return;
     }
     const p = storage.loadProfile();
@@ -266,9 +281,10 @@ class App {
     if (st.notifyDesktop && !document.hasFocus()) {
       const author = s.profileOf(m.author).name;
       const chName = s.state.channels.find((c) => c.id === m.ch)?.name ?? m.ch;
-      const body = m.text || (m.att?.length ? `📎 ${m.att.length} anexo(s)` : "");
+      // por padrão a notificação não mostra o conteúdo (ela aparece na tela e fica no histórico do Windows)
+      const body = !st.notifyPreview ? (mention ? "Mencionou você" : "Nova mensagem") : m.text || (m.att?.length ? `📎 ${m.att.length} anexo(s)` : "");
       try {
-        const n = new Notification(`${author} (#${chName}, ${s.name})`, { body: body.slice(0, 200), silent: true, icon: s.profileOf(m.author).avatar });
+        const n = new Notification(st.notifyPreview ? `${author} (#${chName}, ${s.name})` : `${author} · ${s.name}`, { body: body.slice(0, 200), silent: true, icon: s.profileOf(m.author).avatar });
         n.onclick = () => {
           window.nexo?.focus();
           this.selectServer(s.server.roomId);
@@ -407,7 +423,9 @@ class App {
     };
     this.addServer(server);
     const s = this.sessions.get(server.sid)!;
-    // registra nome e canais como eventos assinados (fonte da verdade para todos)
+    // registra nome e canais como eventos assinados (fonte da verdade para todos).
+    // Seguro por padrão: novos membros precisam de aprovação de um admin.
+    s.publish({ k: "policy", approval: true });
     s.publish({ k: "name", name: server.name });
     for (const c of server.channels) s.publish({ k: "chan", id: c.id, name: c.name });
     return server;
@@ -557,8 +575,18 @@ export function isTyping(e: KeyboardEvent) {
 }
 
 export const app = new App();
-// útil para depurar pelo DevTools (Ctrl+Shift+I)
-(window as unknown as { __nexo: App }).__nexo = app;
+// gancho para testes automatizados/depuração — só existe fora do app instalado
+if (window.nexo?.debug || import.meta.env.DEV) Object.assign(window, { __nexo: app, __nexoLib: { openBackup, testOverrideFingerprint } });
+
+/** Apaga todos os dados locais e recomeça (usado quando o cofre não abre). */
+export async function resetLocalData() {
+  await flushSecureStore();
+  if (window.nexo) await window.nexo.resetVault();
+  else {
+    localStorage.clear();
+    location.reload();
+  }
+}
 
 /** Re-renderiza o componente sempre que algo no app mudar. */
 export function useApp() {

@@ -1,25 +1,32 @@
 /**
- * Banco local (IndexedDB). Sem o limite de ~5 MB do localStorage, então aguenta
- * histórico longo e anexos (imagens/arquivos).
+ * Banco local (IndexedDB) com todo o conteúdo cifrado pelo cofre (AES-256-GCM).
+ * Em claro ficam só identificadores aleatórios necessários para indexar
+ * (id do evento, id do servidor, chave pública); textos, nomes, fotos e
+ * arquivos nunca tocam o disco sem cifra.
  */
 import type { Member, StoredEvent } from "./types";
+import { open as openBox, openJson, seal, sealJson } from "./vault";
 
-const DB_NAME = "nexo";
+const DB_NAME = "nexo-secure";
 const VERSION = 1;
 
 let dbp: Promise<IDBDatabase> | null = null;
 
-function open(): Promise<IDBDatabase> {
+function openDb(): Promise<IDBDatabase> {
   if (dbp) return dbp;
+  // banco antigo (versões de teste, sem cifra) é apagado
+  try {
+    indexedDB.deleteDatabase("nexo");
+  } catch {
+    /* ignore */
+  }
   dbp = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
-      const ev = db.createObjectStore("events", { keyPath: "id" });
-      ev.createIndex("srv", "srv");
+      db.createObjectStore("events", { keyPath: "id" }).createIndex("srv", "srv");
       db.createObjectStore("blobs", { keyPath: "id" });
-      const m = db.createObjectStore("members", { keyPath: ["srv", "pub"] });
-      m.createIndex("srv", "srv");
+      db.createObjectStore("members", { keyPath: ["srv", "pub"] }).createIndex("srv", "srv");
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -35,45 +42,79 @@ function wrap<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 async function store(name: string, mode: IDBTransactionMode = "readonly") {
-  return (await open()).transaction(name, mode).objectStore(name);
+  return (await openDb()).transaction(name, mode).objectStore(name);
 }
 
 export type BlobRecord = { id: string; data: ArrayBuffer; mime: string; name: string; ts: number };
 
+type EncRow = { id: string; srv: string; d: Uint8Array<ArrayBuffer> };
+type EncMember = { srv: string; pub: string; d: Uint8Array<ArrayBuffer> };
+type EncBlob = { id: string; meta: Uint8Array<ArrayBuffer>; d: Uint8Array<ArrayBuffer> };
+
 export const db = {
   async loadEvents(srv: string): Promise<StoredEvent[]> {
-    return wrap((await store("events")).index("srv").getAll(srv)) as Promise<StoredEvent[]>;
+    const rows = (await wrap((await store("events")).index("srv").getAll(srv))) as EncRow[];
+    const out: StoredEvent[] = [];
+    for (const r of rows) {
+      try {
+        out.push(await openJson<StoredEvent>(r.d, `ev:${srv}:${r.id}`));
+      } catch {
+        console.warn("evento local corrompido ignorado", r.id);
+      }
+    }
+    return out;
   },
   async putEvents(evs: StoredEvent[]) {
     if (!evs.length) return;
-    const tx = (await open()).transaction("events", "readwrite");
+    const rows: EncRow[] = await Promise.all(evs.map(async (e) => ({ id: e.id, srv: e.srv, d: await sealJson(e, `ev:${e.srv}:${e.id}`) })));
+    const tx = (await openDb()).transaction("events", "readwrite");
     const st = tx.objectStore("events");
-    for (const e of evs) st.put(e);
+    for (const r of rows) st.put(r);
     await new Promise<void>((res, rej) => {
       tx.oncomplete = () => res();
       tx.onerror = () => rej(tx.error);
     });
   },
   async deleteServer(srv: string) {
-    const st = await store("events", "readwrite");
-    const keys = await wrap(st.index("srv").getAllKeys(srv));
-    const st2 = await store("events", "readwrite");
-    for (const k of keys) st2.delete(k);
-    const ms = await store("members", "readwrite");
-    const mkeys = await wrap(ms.index("srv").getAllKeys(srv));
-    const ms2 = await store("members", "readwrite");
-    for (const k of mkeys) ms2.delete(k);
+    for (const name of ["events", "members"]) {
+      const st = await store(name, "readwrite");
+      const keys = await wrap(st.index("srv").getAllKeys(srv));
+      const st2 = await store(name, "readwrite");
+      for (const k of keys) st2.delete(k);
+    }
   },
   async getBlob(id: string): Promise<BlobRecord | undefined> {
-    return wrap((await store("blobs")).get(id)) as Promise<BlobRecord | undefined>;
+    const r = (await wrap((await store("blobs")).get(id))) as EncBlob | undefined;
+    if (!r) return undefined;
+    try {
+      const meta = await openJson<{ mime: string; name: string; ts: number }>(r.meta, `blobmeta:${id}`);
+      const data = await openBox(r.d, `blob:${id}`);
+      return { id, data, ...meta };
+    } catch {
+      return undefined;
+    }
+  },
+  async hasBlob(id: string): Promise<boolean> {
+    return (await wrap((await store("blobs")).count(id))) > 0;
   },
   async putBlob(b: BlobRecord) {
-    await wrap((await store("blobs", "readwrite")).put(b));
+    const row: EncBlob = { id: b.id, meta: await sealJson({ mime: b.mime, name: b.name, ts: b.ts }, `blobmeta:${b.id}`), d: await seal(b.data, `blob:${b.id}`) };
+    await wrap((await store("blobs", "readwrite")).put(row));
   },
   async loadMembers(srv: string): Promise<Member[]> {
-    return wrap((await store("members")).index("srv").getAll(srv)) as Promise<Member[]>;
+    const rows = (await wrap((await store("members")).index("srv").getAll(srv))) as EncMember[];
+    const out: Member[] = [];
+    for (const r of rows) {
+      try {
+        out.push(await openJson<Member>(r.d, `mem:${srv}:${r.pub}`));
+      } catch {
+        /* ignora */
+      }
+    }
+    return out;
   },
   async putMember(m: Member) {
-    await wrap((await store("members", "readwrite")).put(m));
+    const row: EncMember = { srv: m.srv, pub: m.pub, d: await sealJson(m, `mem:${m.srv}:${m.pub}`) };
+    await wrap((await store("members", "readwrite")).put(row));
   },
 };

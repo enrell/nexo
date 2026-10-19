@@ -7,6 +7,10 @@ interface Window {
   /** Exposto pelo preload do Electron (ausente no navegador comum). */
   nexo?: {
     platform: string;
+    /** ganchos de teste/depuração (nunca no app instalado) */
+    debug: boolean;
+    getVaultKey: () => Promise<string>;
+    resetVault: () => Promise<void>;
     getSources: () => Promise<NexoSource[]>;
     selectSource: (id: string, audio: boolean) => Promise<void>;
     getPendingUrl: () => Promise<string | null>;

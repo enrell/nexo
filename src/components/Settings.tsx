@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { COLORS, useApp } from "../lib/app";
+import { COLORS, resetLocalData, useApp } from "../lib/app";
+import { openBackup, storeRestoredIdentity } from "../lib/identity";
 import { logs } from "../lib/logs";
 import { mediaErrorMessage } from "../lib/rtc";
 import type { Session } from "../lib/session";
-import { PRESETS, encodeInvite, inviteLink } from "../lib/storage";
+import { PRESETS, encodeInvite, flushSecureStore, inviteLink, storage } from "../lib/storage";
 import type { Codec, Quality, Settings, StreamPreset } from "../lib/types";
-import { Avatar, Icons, Toggle, lastSeenLabel } from "./common";
+import { Avatar, Icons, Modal, Toggle, lastSeenLabel } from "./common";
+import { openSafety } from "./Safety";
 import { keyLabel } from "./Sidebar";
 
 type Section = { id: string; label: string; group: string; render: () => ReactNode };
@@ -85,6 +87,7 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
     { id: "account", label: "Minha conta", group: "Configurações de usuário", render: () => <AccountSection /> },
     { id: "voice", label: "Voz e vídeo", group: "Configurações de usuário", render: () => <VoiceSection /> },
     { id: "stream", label: "Transmissão", group: "Configurações de usuário", render: () => <StreamSection /> },
+    { id: "privacy", label: "Privacidade e segurança", group: "Configurações de usuário", render: () => <PrivacySection /> },
     { id: "network", label: "Rede e ajuda ao servidor", group: "Configurações de usuário", render: () => <NetworkSection /> },
     {
       id: "notify",
@@ -126,7 +129,6 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
             <input type="range" min={70} max={150} step={5} value={st.zoom} onChange={(e) => set({ zoom: +e.target.value })} />
           </Field>
           <Toggle label="Modo compacto" hint="Mensagens mais juntas, avatares menores." checked={st.compact} onChange={(v) => set({ compact: v })} />
-          <Toggle label="Prévia de links" hint="Mostra título e imagem de links. Seu PC acessa o site para buscar a prévia." checked={st.linkPreviews} onChange={(v) => set({ linkPreviews: v })} />
         </>
       ),
     },
@@ -221,28 +223,27 @@ function AccountSection() {
     }
   };
 
-  const backup = () => {
-    const data = JSON.stringify({ nexoBackup: 1, identity: a.identity.exportBackup(), profile: a.profile, servers: a.servers }, null, 2);
+  const [backupMode, setBackupMode] = useState<null | "export" | { file: File }>(null);
+
+  const doExport = async (pass: string) => {
+    const data = await a.identity.exportBackup(pass, { profile: a.profile, servers: a.servers });
     const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
     const el = document.createElement("a");
     el.href = url;
-    el.download = `nexo-conta-${p.name}.json`;
+    el.download = `nexo-conta-${p.name}.nexobackup.json`;
     el.click();
     URL.revokeObjectURL(url);
+    a.showToast("Backup cifrado exportado. Guarde a senha: sem ela o arquivo não abre.");
   };
 
-  const restore = async (f: File) => {
-    try {
-      const d = JSON.parse(await f.text());
-      if (d.nexoBackup !== 1 || !d.identity) throw new Error("arquivo inválido");
-      if (!confirm("Restaurar esta conta? A conta atual deste PC será substituída e o app vai reiniciar.")) return;
-      localStorage.setItem("nexo:identity", d.identity);
-      if (d.profile) localStorage.setItem("nexo:profile", JSON.stringify(d.profile));
-      if (Array.isArray(d.servers)) localStorage.setItem("nexo:servers", JSON.stringify(d.servers));
-      location.reload();
-    } catch (e) {
-      a.showToast("Backup inválido: " + (e instanceof Error ? e.message : e), "error");
-    }
+  const doRestore = async (file: File, pass: string) => {
+    const d = await openBackup(await file.text(), pass);
+    if (!confirm("Restaurar esta conta? A conta atual deste PC será substituída e o app vai reiniciar.")) return;
+    storeRestoredIdentity(d.identity);
+    if (d.profile && typeof d.profile === "object") storage.set("profile", { ...(d.profile as object), userId: d.identity.pub });
+    if (Array.isArray(d.servers)) storage.set("servers", d.servers);
+    await flushSecureStore();
+    location.reload();
   };
 
   return (
@@ -281,17 +282,159 @@ function AccountSection() {
       <h3>Backup da conta</h3>
       <p className="dim small">
         Sua conta é uma chave criptográfica guardada só neste PC — é ela que prova que você é você. Faça um backup para usar a mesma conta em outro computador ou não perdê-la ao formatar.{" "}
-        <strong>Não compartilhe o arquivo</strong>: quem tiver ele pode se passar por você.
+        O arquivo é cifrado com uma senha que você escolhe (AES-256, derivação PBKDF2 com 600 mil iterações). <strong>Sem a senha não dá para recuperar.</strong>
       </p>
       <div className="row">
-        <button className="btn" onClick={backup}>
+        <button className="btn" onClick={() => setBackupMode("export")}>
           Exportar backup
         </button>
         <button className="btn ghost" onClick={() => restoreRef.current?.click()}>
           Restaurar backup
         </button>
       </div>
-      <input ref={restoreRef} type="file" accept="application/json,.json" hidden onChange={(e) => e.target.files?.[0] && restore(e.target.files[0])} />
+      <input
+        ref={restoreRef}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (f) setBackupMode({ file: f });
+        }}
+      />
+      {backupMode && (
+        <PassphraseModal
+          confirmTwice={backupMode === "export"}
+          title={backupMode === "export" ? "Senha do backup" : "Senha do backup a restaurar"}
+          onClose={() => setBackupMode(null)}
+          onSubmit={async (pass) => {
+            if (backupMode === "export") await doExport(pass);
+            else await doRestore(backupMode.file, pass);
+            setBackupMode(null);
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+function PassphraseModal({ title, confirmTwice, onClose, onSubmit }: { title: string; confirmTwice: boolean; onClose: () => void; onSubmit: (p: string) => Promise<void> }) {
+  const [p1, setP1] = useState("");
+  const [p2, setP2] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const weak = confirmTwice && p1.length < 12;
+  const mismatch = confirmTwice && p1 !== p2;
+  const submit = async () => {
+    if (!p1 || weak || mismatch || busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await onSubmit(p1);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <Modal
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="btn" disabled={!p1 || weak || mismatch || busy} onClick={submit}>
+            {busy ? "Processando…" : "Continuar"}
+          </button>
+        </>
+      }
+    >
+      <Field label="Senha" hint={confirmTwice ? "Mínimo de 12 caracteres. Uma frase é mais fácil de lembrar e mais forte." : undefined}>
+        <input type="password" autoFocus value={p1} onChange={(e) => setP1(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} autoComplete="new-password" />
+      </Field>
+      {confirmTwice && (
+        <Field label="Repita a senha">
+          <input type="password" value={p2} onChange={(e) => setP2(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()} autoComplete="new-password" />
+        </Field>
+      )}
+      {confirmTwice && p1 && weak && <div className="error">Senha curta demais.</div>}
+      {confirmTwice && p2 && mismatch && <div className="error">As senhas não são iguais.</div>}
+      {err && <div className="error">{err}</div>}
+    </Modal>
+  );
+}
+
+function PrivacySection() {
+  const a = useApp();
+  const st = a.settings;
+  const set = (patch: Partial<Settings>) => a.setSettings({ ...a.settings, ...patch });
+  const groups = a.identity.pub.match(/.{1,4}/g) ?? [];
+  const s = a.session;
+  const online = s ? Object.values(s.peers).filter((p) => p.profile) : [];
+  return (
+    <>
+      <div className="security-card">
+        <Icons.Shield size={28} />
+        <div>
+          <strong>Tudo é criptografado, por padrão</strong>
+          <ul className="dim small">
+            <li>Conversas, voz e lives vão direto entre os PCs, cifrados (DTLS/SRTP) e com a identidade de cada um conferida.</li>
+            <li>Cada mensagem é assinada com a sua chave (Ed25519): ninguém consegue se passar por você nem alterar o que você escreveu.</li>
+            <li>Tudo que fica no disco (mensagens, arquivos, convites, sua chave) é cifrado com AES-256-GCM. A chave do cofre é protegida pelo Windows e só abre na sua conta.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>O que sai do seu PC</h3>
+      <Toggle
+        label="Prévia de links e imagens externas"
+        hint="Ligado: seu PC acessa os sites dos links (e o YouTube) para mostrar título e imagem, e esses sites veem seu IP. Desligado por padrão."
+        checked={st.linkPreviews}
+        onChange={(v) => set({ linkPreviews: v })}
+      />
+      <Toggle
+        label="Esconder meu IP dos outros (só via TURN)"
+        hint={st.turnUrl ? "Todo o tráfego passa pelo seu servidor TURN; os amigos não veem seu IP. Reinicie o app para aplicar." : "Precisa de um servidor TURN configurado em Rede."}
+        checked={st.relayOnly && !!st.turnUrl}
+        onChange={(v) => {
+          if (st.turnUrl) set({ relayOnly: v });
+        }}
+      />
+      <Toggle
+        label="Mostrar o texto das mensagens nas notificações"
+        hint="Desligado: a notificação mostra só quem mandou. As notificações ficam no histórico do Windows."
+        checked={st.notifyPreview}
+        onChange={(v) => set({ notifyPreview: v })}
+      />
+
+      <h3>Sua chave pública</h3>
+      <p className="dim small">É a sua identidade no Nexo. Para ter certeza de que está falando com a pessoa certa, use “Verificar identidade” no clique direito de um membro e comparem o número de segurança.</p>
+      <div className="key-box mono">{groups.join(" ")}</div>
+      {s && online.length > 0 && (
+        <div className="row wrap">
+          {online.slice(0, 6).map((p) => (
+            <button key={p.pub} className="btn ghost small" onClick={() => openSafety(s, p.pub)}>
+              Verificar {s.profileOf(p.pub).name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <h3>Dados deste PC</h3>
+      <p className="dim small">Apaga sua chave, servidores, mensagens e arquivos deste computador. Sem um backup, sua conta não pode ser recuperada.</p>
+      <div>
+        <button
+          className="btn danger"
+          onClick={() => {
+            if (confirm("Apagar TODOS os dados do Nexo deste PC? Isso não pode ser desfeito.") && confirm("Tem certeza? Sem backup, sua conta será perdida.")) resetLocalData();
+          }}
+        >
+          Apagar todos os dados locais
+        </button>
+      </div>
     </>
   );
 }
@@ -800,11 +943,47 @@ export function ServerSettingsScreen({ s, onClose }: { s: Session; onClose: () =
       group: st.name,
       render: () => (
         <>
-          {!owner && <p className="dim small">Só o dono pode nomear administradores. Administradores podem banir, gerenciar canais e renovar o convite.</p>}
+          {s.server.owner && (
+            <Toggle
+              label="Novos membros precisam de aprovação"
+              hint="Recomendado. Quem entra com o convite só vê o histórico e participa depois que um administrador aprovar. Se o convite vazar, estranhos ficam na porta."
+              checked={st.approval}
+              onChange={(v) => {
+                if (s.isAdmin()) s.setApproval(v);
+              }}
+            />
+          )}
+          {s.pendingPeers().length > 0 && (
+            <>
+              <h3>Pedindo para entrar</h3>
+              <div className="list">
+                {s.pendingPeers().map(([id, p]) => (
+                  <div key={id} className="list-row">
+                    <Avatar name={p.profile!.name} color={p.profile!.color} src={p.profile!.avatar} size={32} ring="var(--bg-main)" />
+                    <div className="grow">
+                      <div>{s.profileOf(p.pub).name}</div>
+                      <div className="dim small mono">{p.pub.slice(0, 20)}…</div>
+                    </div>
+                    <button className="btn ghost small" onClick={() => openSafety(s, p.pub)}>
+                      Verificar
+                    </button>
+                    <button className="btn small" onClick={() => s.admit(p.pub, true)}>
+                      Aprovar
+                    </button>
+                    <button className="btn ghost small danger-text" onClick={() => confirm(`Recusar e banir ${p.profile!.name}?`) && s.admit(p.pub, false)}>
+                      Recusar
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <h3>Membros</h3>
+            </>
+          )}
+          {!owner && <p className="dim small">Só o dono pode nomear administradores. Administradores podem aprovar entradas, banir, gerenciar canais e renovar o convite.</p>}
           <div className="list">
             {Object.values(s.members)
               .concat(s.members[s.me] ? [] : [{ srv: "", pub: s.me, name: a.profile!.name, color: a.profile!.color, avatar: a.profile!.avatar, lastSeen: Date.now() }])
-              .filter((m) => !st.banned.has(m.pub))
+              .filter((m) => s.isMember(m.pub))
               .map((m) => {
                 const isAdm = st.admins.has(m.pub);
                 const online = s.profileOf(m.pub).online;

@@ -7,16 +7,10 @@ import type { Settings } from "./types";
 
 type Remote = { pub: string; el: HTMLAudioElement; src: MediaStreamAudioSourceNode; gain: GainNode; analyser: AnalyserNode; speakingUntil: number };
 
-const VOL_KEY = "nexo:uservol";
-const LOCAL_MUTE_KEY = "nexo:localmute";
+import { storage } from "./storage";
 
-function loadJson<T>(k: string, f: T): T {
-  try {
-    return JSON.parse(localStorage.getItem(k) ?? "") as T;
-  } catch {
-    return f;
-  }
-}
+const VOL_KEY = "uservol";
+const LOCAL_MUTE_KEY = "localmute";
 
 function levelDb(an: AnalyserNode, buf: Float32Array<ArrayBuffer>) {
   an.getFloatTimeDomainData(buf);
@@ -46,14 +40,20 @@ export class AudioEngine {
 
   private remotes = new Map<string, Remote>();
   speaking = new Set<string>();
-  userVolumes: Record<string, number> = loadJson(VOL_KEY, {});
-  localMutes = new Set<string>(loadJson<string[]>(LOCAL_MUTE_KEY, []));
+  userVolumes: Record<string, number> = {};
+  localMutes = new Set<string>();
 
   private timer: number | undefined;
   private buf = new Float32Array(1024);
   onChange: () => void = () => {};
 
   constructor(private settings: () => Settings) {}
+
+  /** carrega volumes individuais do armazenamento cifrado (depois que o cofre abriu) */
+  loadPrefs() {
+    this.userVolumes = storage.get<Record<string, number>>(VOL_KEY, {});
+    this.localMutes = new Set(storage.get<string[]>(LOCAL_MUTE_KEY, []));
+  }
 
   private ensureCtx() {
     if (!this.ctx) {
@@ -189,7 +189,7 @@ export class AudioEngine {
 
   setUserVolume(pub: string, vol: number) {
     this.userVolumes[pub] = vol;
-    localStorage.setItem(VOL_KEY, JSON.stringify(this.userVolumes));
+    storage.set(VOL_KEY, this.userVolumes);
     for (const r of this.remotes.values()) if (r.pub === pub) this.applyUserVolume(r);
     this.onChange();
   }
@@ -197,7 +197,7 @@ export class AudioEngine {
   toggleLocalMute(pub: string) {
     if (this.localMutes.has(pub)) this.localMutes.delete(pub);
     else this.localMutes.add(pub);
-    localStorage.setItem(LOCAL_MUTE_KEY, JSON.stringify([...this.localMutes]));
+    storage.set(LOCAL_MUTE_KEY, [...this.localMutes]);
     for (const r of this.remotes.values()) if (r.pub === pub) this.applyUserVolume(r);
     this.onChange();
   }

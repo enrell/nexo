@@ -13,14 +13,38 @@
  */
 import { joinRoom, selfId, type DataPayload, type Room } from "trystero";
 import { db } from "./db";
-import { derive, dayKey, summarize, type Derived } from "./derive";
-import { sha256, verify, type Identity } from "./identity";
-import { makePeerConnectionClass } from "./rtc";
+import { derive, dayKey, isMemberOf, summarize, type Derived } from "./derive";
+import { isPubKey, sha256, verify, type Identity } from "./identity";
+import { makePeerConnectionClass, myFingerprint, remoteFingerprint } from "./rtc";
 import { randomId } from "./storage";
 import type { Attachment, EventBody, LiveInfo, Member, MsgView, PeerInfo, Profile, ServerInfo, Settings, SignedEvent, StoredEvent, WatchState } from "./types";
 
-export const APP_ID = "nexo-p2p-v2";
-export const PROTO = 2;
+export const APP_ID = "nexo-p2p-v3";
+export const PROTO = 3;
+/** maior evento aceito (JSON); mensagens têm até 4000 caracteres */
+const MAX_EVENT_BYTES = 24 * 1024;
+const GOVERNANCE = new Set(["role", "ban", "chan", "name", "move", "admit", "policy"]);
+const KINDS = new Set(["msg", "edit", "del", "react", ...GOVERNANCE]);
+
+/** Limite simples por peer (token bucket) contra inundação. */
+class Bucket {
+  private tokens: number;
+  private last = Date.now();
+  constructor(
+    private capacity: number,
+    private perSecond: number,
+  ) {
+    this.tokens = capacity;
+  }
+  take(n = 1) {
+    const now = Date.now();
+    this.tokens = Math.min(this.capacity, this.tokens + ((now - this.last) / 1000) * this.perSecond);
+    this.last = now;
+    if (this.tokens < n) return false;
+    this.tokens -= n;
+    return true;
+  }
+}
 export { selfId };
 
 export const MAX_FILE = 25 * 1024 * 1024;
@@ -68,7 +92,12 @@ export class Session {
   blobsLoading = new Set<string>();
   private derivedCache: Derived | null = null;
   private moving = false;
-  private handshakePub: Record<string, string> = {};
+  private handshakeInfo: Record<string, { pub: string; fp: string }> = {};
+  /** peers que já receberam nosso estado completo (são membros) */
+  private synced = new Set<string>();
+  private buckets: Record<string, { ev: Bucket; small: Bucket; blob: Bucket }> = {};
+  /** um membro nos avisou que ainda precisamos ser aprovados */
+  awaitingApproval = false;
 
   // live (transmissor)
   myStream: MediaStream | null = null;
@@ -90,6 +119,7 @@ export class Session {
 
   private act: ReturnType<Session["makeActions"]>;
   private statsTimer: number;
+  private resyncTimer: number;
   private lastTypingSent = 0;
 
   constructor(
@@ -109,7 +139,8 @@ export class Session {
         password: server.password,
         turnConfig,
         relayConfig: urls.length ? { urls } : { redundancy: 6 },
-        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec),
+        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && !!s.turnUrl),
+        maxReceiveBytes: 32 * 1024 * 1024,
       },
       server.roomId,
       {
@@ -128,18 +159,48 @@ export class Session {
     r.onPeerLeave = (id) => this.onPeerLeave(id);
     r.onPeerStream = (stream, id, meta) => this.onPeerStream(stream, id, meta as MediaMeta | undefined);
 
-    this.act.hello.onMessage = (h: Hello, { peerId }) => this.onHello(peerId, h);
-    this.act.state.onMessage = (p: StatePatch, { peerId }) => this.onState(peerId, p);
-    this.act.ev.onMessage = (evs: SignedEvent[], { peerId }) => this.receiveEvents(evs, peerId, true);
-    this.act.sum.onMessage = (sum: Record<string, string>, { peerId }) => this.onSummary(peerId, sum);
-    this.act.have.onMessage = (have: Record<string, string[]>, { peerId }) => this.onHave(peerId, have);
-    this.act.typing.onMessage = (d: { ch: string }, { peerId }) => this.onTyping(peerId, d?.ch);
-    this.act.leaveTree.onMessage = (_: unknown, { peerId }) => this.onLeaveTree(peerId);
+    // tudo que chega passa por: limite de taxa + "esse peer pode me mandar isso?"
+    this.act.hello.onMessage = (h: Hello, { peerId }) => {
+      if (this.allow(peerId, "small", false)) void this.onHello(peerId, h);
+    };
+    this.act.state.onMessage = (p: StatePatch, { peerId }) => {
+      if (this.allow(peerId, "small", false)) void this.onState(peerId, p);
+    };
+    this.act.ev.onMessage = (evs: SignedEvent[], { peerId }) => {
+      if (this.allow(peerId, "ev", true, Array.isArray(evs) ? evs.length : 1)) void this.receiveEvents(evs, peerId, true);
+    };
+    this.act.sum.onMessage = (sum: Record<string, string>, { peerId }) => {
+      if (this.allow(peerId, "small", true)) void this.onSummary(peerId, sum);
+    };
+    this.act.have.onMessage = (have: Record<string, string[]>, { peerId }) => {
+      if (this.allow(peerId, "small", true)) void this.onHave(peerId, have);
+    };
+    this.act.typing.onMessage = (d: { ch: string }, { peerId }) => {
+      if (this.allow(peerId, "small", true)) void this.onTyping(peerId, d?.ch);
+    };
+    this.act.gate.onMessage = (d: { pending: boolean }, { peerId }) => {
+      if (!this.allow(peerId, "small", false)) return;
+      // só vale se vier de quem já é membro para nós (ou se ainda não sabemos nada do servidor)
+      if (this.events.size > 0 && !this.isMember(this.peers[peerId]?.pub ?? "")) return;
+      const st = this.state;
+      // um membro diz que ainda não fomos aprovados (a menos que já tenhamos o "admit" assinado)
+      this.awaitingApproval = !!d?.pending && !(st.approval && isMemberOf(st, this.server.owner, this.me));
+      if (this.awaitingApproval) this.synced.clear();
+      ctx.emit();
+    };
+    this.act.leaveTree.onMessage = (_: unknown, { peerId }) => {
+      if (this.allow(peerId, "small", true)) void this.onLeaveTree(peerId);
+    };
     this.act.reparent.onMessage = (d: { origin: string }, { peerId }) => {
-      if (this.watching?.origin === d.origin && this.watching.parent === peerId) this.rewatch();
+      if (!this.allow(peerId, "small", true)) return;
+      if (this.watching?.origin === d?.origin && this.watching.parent === peerId) this.rewatch();
     };
 
     this.statsTimer = window.setInterval(() => this.updateStats(), 5000);
+    // ressincroniza de tempos em tempos: cura qualquer lacuna (mensagem perdida, limite de taxa…)
+    this.resyncTimer = window.setInterval(() => {
+      if (this.loaded && this.isMember()) this.toMembers((target) => this.act.sum.send(summarize(this.events.values()), { target }));
+    }, 60_000);
     this.load();
   }
 
@@ -153,13 +214,23 @@ export class Session {
       sum: r.makeAction<any>("sum"),
       have: r.makeAction<any>("have"),
       typing: r.makeAction<any>("typing"),
+      gate: r.makeAction<any>("gate"),
       leaveTree: r.makeAction<any>("leavetree"),
       reparent: r.makeAction<any>("reparent"),
-      watch: r.makeAction<any, any>("watch", { kind: "request", onRequest: (d: { failed?: string }, c) => this.handleWatch(c.peerId, d?.failed) }),
-      relay: r.makeAction<any, any>("relay", { kind: "request", onRequest: (d: { origin: string }, c) => this.handleRelay(c.peerId, d?.origin) }),
+      watch: r.makeAction<any, any>("watch", {
+        kind: "request",
+        onRequest: (d: { failed?: string }, c) => (this.allow(c.peerId, "small", true) ? this.handleWatch(c.peerId, d?.failed) : { ok: false, reason: "sem permissão" }),
+      }),
+      relay: r.makeAction<any, any>("relay", {
+        kind: "request",
+        onRequest: (d: { origin: string }, c) => (this.allow(c.peerId, "small", true) ? this.handleRelay(c.peerId, d?.origin) : { ok: false }),
+      }),
       blob: r.makeAction<any, any>("blob", {
         kind: "request",
-        onRequest: async (d: { id: string }) => (await db.getBlob(String(d?.id)))?.data ?? null,
+        onRequest: async (d: { id: string }, c) => {
+          if (!this.allow(c.peerId, "blob", true) || typeof d?.id !== "string" || !/^[\w-]{32}$/.test(d.id)) return null;
+          return (await db.getBlob(d.id))?.data ?? null;
+        },
       }),
     };
     /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -171,8 +242,7 @@ export class Session {
     for (const m of mems) this.members[m.pub] = m;
     this.loaded = true;
     this.invalidate();
-    const ids = Object.keys(this.peers);
-    if (ids.length) this.act.sum.send(summarize(this.events.values()), { target: ids });
+    for (const id of Object.keys(this.peers)) this.greet(id);
   }
 
   get name() {
@@ -192,7 +262,7 @@ export class Session {
       this.server.channels = st.channels;
       this.ctx.saveServers();
     }
-    if (st.move && (st.move.r !== this.server.roomId || st.move.p !== this.server.password) && !st.banned.has(this.me) && !this.moving) {
+    if (st.move && (st.move.r !== this.server.roomId || st.move.p !== this.server.password) && this.isMember() && !this.moving) {
       // espera um pouco para o aviso se espalhar antes de sair da sala antiga
       this.moving = true;
       const { r, p } = st.move;
@@ -208,6 +278,9 @@ export class Session {
       }
     }
     if (st.banned.has(this.me)) this.joinError = "Você foi banido deste servidor.";
+    if (this.awaitingApproval && isMemberOf(st, this.server.owner, this.me) && st.approval) this.awaitingApproval = false;
+    // quem acabou de ser aprovado recebe nosso estado completo
+    if (this.loaded) for (const id of Object.keys(this.peers)) if (!this.synced.has(id) && this.isMember(this.peers[id].pub)) this.greet(id);
     this.ctx.emit();
   }
 
@@ -220,34 +293,104 @@ export class Session {
   isOwner(pub = this.me) {
     return !!this.server.owner && pub === this.server.owner;
   }
+  /** Membro = pode ver o histórico e participar (aprovado, se a aprovação estiver ligada). */
+  isMember(pub = this.me) {
+    if (pub === this.me && this.awaitingApproval) return false;
+    return isMemberOf(this.state, this.server.owner, pub);
+  }
+  /** Peers conectados que são membros (os únicos que recebem conteúdo). */
+  memberPeers(): string[] {
+    return Object.entries(this.peers)
+      .filter(([, p]) => this.isMember(p.pub))
+      .map(([id]) => id);
+  }
+  /** Pessoas conectadas esperando aprovação de um admin. */
+  pendingPeers(): [string, PeerInfo][] {
+    return Object.entries(this.peers).filter(([, p]) => p.profile && !this.isMember(p.pub) && !this.state.banned.has(p.pub));
+  }
+  /** Envia para todos os membros conectados (nunca para pendentes/banidos). */
+  private toMembers(send: (target: string[]) => void) {
+    const ids = this.memberPeers();
+    if (ids.length) send(ids);
+  }
+
+  /**
+   * Porteiro de tudo que chega: limite de taxa por peer e, para conteúdo,
+   * só aceitamos de membros (se nós mesmos já somos membros; um recém-chegado
+   * aceita a sincronização inicial e o estado derivado filtra os autores).
+   */
+  private allow(peerId: string, kind: "ev" | "small" | "blob", needsMember: boolean, n = 1): boolean {
+    const p = this.peers[peerId];
+    if (!p) return false;
+    const b = (this.buckets[peerId] ??= { ev: new Bucket(20000, 2000), small: new Bucket(120, 30), blob: new Bucket(10, 1) });
+    if (!b[kind].take(n)) {
+      console.warn("peer excedeu o limite de taxa:", kind, p.pub.slice(0, 8));
+      return false;
+    }
+    if (needsMember && this.isMember() && !this.isMember(p.pub)) return false;
+    return true;
+  }
 
   // ------------------------------------------------------------------ handshake
 
+  /**
+   * Autenticação mútua: cada lado assina (desafio do outro, sala, impressão
+   * digital do próprio certificado DTLS, impressão digital do outro). Depois
+   * da conexão, conferimos que o certificado DTLS real bate com o assinado.
+   */
   private async handshake(peerId: string, send: (d: DataPayload) => Promise<void>, receive: () => Promise<{ data: DataPayload }>) {
-    const nonce = randomId(24);
-    await send({ pub: this.me, nonce, v: PROTO });
-    const h = (await receive()).data as { pub: string; nonce: string; v: number } | null;
+    const nonce = randomId(32);
+    const myFp = myFingerprint();
+    await send({ pub: this.me, nonce, v: PROTO, fp: myFp });
+    const h = (await receive()).data as { pub: string; nonce: string; v: number; fp: string } | null;
     if (!h || h.v !== PROTO) throw new Error("versão do Nexo incompatível — atualize o app");
-    await send({ sig: await this.ctx.identity.sign(`nexo-hs:${this.server.sid}:${h.nonce}`) });
+    if (!isPubKey(h.pub) || typeof h.nonce !== "string" || h.nonce.length < 24 || typeof h.fp !== "string" || !/^[0-9A-F]{64}$/.test(h.fp)) throw new Error("handshake inválido");
+    if (h.fp === myFp) throw new Error("conexão consigo mesmo");
+    const ctxStr = (theirNonce: string, signerFp: string, otherFp: string) => `nexo-hs:v${PROTO}:${this.server.sid}:${theirNonce}:${signerFp}:${otherFp}`;
+    await send({ sig: await this.ctx.identity.sign(ctxStr(h.nonce, myFp, h.fp)) });
     const r = (await receive()).data as { sig: string } | null;
-    if (!(await verify(h.pub, `nexo-hs:${this.server.sid}:${nonce}`, r?.sig ?? ""))) throw new Error("assinatura inválida");
+    if (!(await verify(h.pub, ctxStr(nonce, h.fp, myFp), r?.sig ?? ""))) throw new Error("assinatura inválida");
     if (this.state.banned.has(h.pub)) throw new Error("banido");
-    this.handshakePub[peerId] = h.pub;
+    this.handshakeInfo[peerId] = { pub: h.pub, fp: h.fp };
   }
 
   // ------------------------------------------------------------------ peers
 
-  private hello(): Hello {
-    return { profile: this.ctx.profile(), live: this.myLive, inVoice: this.inVoice, muted: this.ctx.muted(), deaf: this.ctx.deaf(), thumb: this.myThumb };
+  private hello(full: boolean): Hello {
+    const base: Hello = { profile: this.ctx.profile(), live: null, inVoice: false, muted: false, deaf: false };
+    if (!full) return base; // pendentes só veem nome e foto
+    return { ...base, live: this.myLive, inVoice: this.inVoice, muted: this.ctx.muted(), deaf: this.ctx.deaf(), thumb: this.myThumb };
+  }
+
+  /** Apresentação + sincronização para um peer (completa só se ele for membro). */
+  private greet(id: string) {
+    const p = this.peers[id];
+    if (!p) return;
+    const member = this.isMember(p.pub);
+    this.act.hello.send(this.hello(member && this.isMember()), { target: id });
+    if (!this.loaded) return;
+    if (member) {
+      this.synced.add(id);
+      this.act.sum.send(summarize(this.events.values()), { target: id });
+    } else if (this.isMember()) {
+      this.act.gate.send({ pending: true }, { target: id });
+    }
   }
 
   private onPeerJoin(id: string) {
-    const pub = this.handshakePub[id];
-    delete this.handshakePub[id];
-    if (!pub) return;
-    this.peers[id] = { pub };
-    this.act.hello.send(this.hello(), { target: id });
-    if (this.loaded) this.act.sum.send(summarize(this.events.values()), { target: id });
+    const info = this.handshakeInfo[id];
+    delete this.handshakeInfo[id];
+    if (!info) return;
+    // channel binding: o certificado DTLS desta conexão tem que ser o que foi assinado
+    const pc = this.room.getPeers()[id];
+    const fp = pc ? remoteFingerprint(pc) : null;
+    if (!fp || fp !== info.fp) {
+      console.error("conexão recusada: certificado DTLS não confere com o assinado (possível intermediário)");
+      pc?.close();
+      return;
+    }
+    this.peers[id] = { pub: info.pub };
+    this.greet(id);
     this.ctx.emit();
   }
 
@@ -255,14 +398,16 @@ export class Session {
     const p = this.peers[peerId];
     if (!p || !h?.profile) return;
     p.profile = sanitizeProfile({ ...h.profile, userId: p.pub }); // vale a chave provada no handshake
-    p.live = h.live;
-    p.thumb = h.thumb;
-    p.muted = h.muted;
-    p.deaf = h.deaf;
-    const wasVoice = p.inVoice;
-    p.inVoice = h.inVoice;
     this.rememberMember(p.pub, p.profile);
-    if (h.inVoice && !wasVoice && this.inVoice) this.sendMic(peerId);
+    if (this.isMember(p.pub) || !this.isMember()) {
+      p.live = h.live && typeof h.live === "object" ? h.live : null;
+      p.thumb = typeof h.thumb === "string" && h.thumb.startsWith("data:image/jpeg;base64,") && h.thumb.length < 80_000 ? h.thumb : undefined;
+      p.muted = !!h.muted;
+      p.deaf = !!h.deaf;
+      const wasVoice = p.inVoice;
+      p.inVoice = !!h.inVoice;
+      if (p.inVoice && !wasVoice && this.inVoice) this.sendMic(peerId);
+    }
     this.ctx.emit();
   }
 
@@ -275,7 +420,9 @@ export class Session {
   private onPeerLeave(id: string) {
     const p = this.peers[id];
     delete this.peers[id];
-    delete this.handshakePub[id];
+    delete this.handshakeInfo[id];
+    delete this.buckets[id];
+    this.synced.delete(id);
     if (p?.pub) {
       const m = this.members[p.pub];
       if (m) db.putMember({ ...m, lastSeen: Date.now() }).catch(() => {});
@@ -297,7 +444,8 @@ export class Session {
 
   private onState(id: string, patch: StatePatch) {
     const prev = this.peers[id];
-    if (!prev || !patch) return;
+    if (!prev || !patch || typeof patch !== "object") return;
+    if (this.isMember() && !this.isMember(prev.pub)) patch = patch.profile ? { profile: patch.profile } : {};
     if (patch.profile) {
       patch.profile = sanitizeProfile({ ...patch.profile, userId: prev.pub });
       this.rememberMember(prev.pub, patch.profile);
@@ -329,16 +477,25 @@ export class Session {
   }
 
   broadcastState(p: StatePatch) {
-    this.act.state.send(p);
+    this.toMembers((target) => this.act.state.send(p, { target }));
   }
 
   peerName(id: string) {
     if (id === selfId) return this.ctx.profile().name;
-    return this.peers[id]?.profile?.name ?? "Conectando…";
+    const p = this.peers[id];
+    return p?.profile ? this.profileOf(p.pub).name : "Conectando…";
   }
 
   /** Perfil para exibir de uma chave pública (online ou já visto antes). */
   profileOf(pub: string): { name: string; color: string; avatar?: string; online: boolean; status?: Profile["status"] } {
+    const base = this.rawProfile(pub);
+    // dois usuários com o mesmo nome: mostra um pedaço da chave para não dar para se passar pelo outro
+    const lower = base.name.toLowerCase();
+    const clash = Object.values(this.members).some((m) => m.pub !== pub && m.name.toLowerCase() === lower) || (pub !== this.me && this.ctx.profile().name.toLowerCase() === lower);
+    return clash ? { ...base, name: `${base.name} #${pub.slice(0, 4)}` } : base;
+  }
+
+  private rawProfile(pub: string): { name: string; color: string; avatar?: string; online: boolean; status?: Profile["status"] } {
     if (pub === this.me) {
       const p = this.ctx.profile();
       return { name: p.name, color: p.color, avatar: p.avatar, online: true, status: p.status };
@@ -390,36 +547,54 @@ export class Session {
 
   async publish(b: EventBody): Promise<StoredEvent> {
     const a = this.me;
+    // relógio lógico: sempre depois de tudo que já vimos (mesmo com o relógio do PC atrasado)
     let ts = Date.now();
-    const target = "target" in b ? this.events.get(b.target) : undefined;
-    if (target && ts <= target.ts) ts = target.ts + 1; // ordem causal mesmo com relógio atrasado
+    for (const e of this.events.values()) if (e.ts >= ts && e.ts < Date.now() + 5 * 60_000) ts = e.ts + 1;
     const data = canonical(a, ts, b);
     const ev: StoredEvent = { id: await sha256(data), a, ts, b, s: await this.ctx.identity.sign(data), srv: this.server.sid };
-    const online = Object.keys(this.peers).length > 0;
+    const online = this.memberPeers().length > 0;
     if (!online) ev.pending = true;
     this.events.set(ev.id, ev);
-    if (online) this.act.ev.send([stripLocal(ev)]);
+    if (online) this.toMembers((target) => this.act.ev.send([stripLocal(ev)], { target }));
     await db.putEvents([ev]);
     this.invalidate();
     return ev;
   }
 
+  /** ações de moderação de quem (ainda) não é admin para nós; reavaliadas quando o estado muda */
+  private quarantine = new Map<string, StoredEvent>();
+
   private async receiveEvents(evs: SignedEvent[], fromPeer: string, live: boolean) {
     if (!Array.isArray(evs)) return;
     const fresh: StoredEvent[] = [];
-    for (const e of evs.slice(0, 1000)) {
-      if (!e || typeof e.id !== "string" || this.events.has(e.id) || typeof e.ts !== "number" || !e.b) continue;
-      if (e.ts > Date.now() + 5 * 60_000) continue;
+    const known = this.events.size > 0;
+    const banned = this.state.banned;
+    // em ordem de tempo: um "torna admin" vem antes das ações desse admin
+    const batch = evs.slice(0, 1000).filter((e) => e && typeof e === "object" && Number.isSafeInteger(e.ts)).sort((x, y) => x.ts - y.ts);
+    const batchAdmins = new Set<string>();
+    for (const e of batch) {
+      if (typeof e.id !== "string" || this.events.has(e.id) || this.quarantine.has(e.id) || !e.b || typeof e.b !== "object") continue;
+      if (e.ts > Date.now() + 5 * 60_000 || !isPubKey(e.a) || !KINDS.has(e.b.k)) continue;
       const data = canonical(e.a, e.ts, e.b);
+      if (data.length > MAX_EVENT_BYTES) continue;
+      if (banned.has(e.a)) continue; // de quem já está banido, nada
       if ((await sha256(data)) !== e.id) continue;
       if (!(await verify(e.a, data, e.s))) continue;
-      const st: StoredEvent = { id: e.id, a: e.a, ts: e.ts, b: e.b, s: e.s, srv: this.server.sid };
-      this.events.set(e.id, st);
-      fresh.push(st);
+      const ev: StoredEvent = { id: e.id, a: e.a, ts: e.ts, b: e.b, s: e.s, srv: this.server.sid };
+      // quem não é admin agora não pode "voltar no tempo" e publicar moderação com data antiga
+      // (ex.: ex-admin forjando um ban). Fica em quarentena até ele virar admin para nós.
+      if (known && GOVERNANCE.has(e.b.k) && !this.isAdmin(e.a) && !batchAdmins.has(e.a)) {
+        if (this.quarantine.size < 1000) this.quarantine.set(ev.id, ev);
+        continue;
+      }
+      if (e.b.k === "role" && e.a === this.server.owner && e.b.role === "admin" && isPubKey(e.b.user)) batchAdmins.add(e.b.user);
+      this.events.set(e.id, ev);
+      fresh.push(ev);
     }
     if (!fresh.length) return;
     await db.putEvents(fresh);
     this.invalidate();
+    await this.retryQuarantine();
     const st = this.state;
     const recent = Date.now() - 2 * 60_000;
     for (const e of fresh) {
@@ -432,13 +607,29 @@ export class Session {
     this.markDelivered();
   }
 
+  private async retryQuarantine() {
+    let changed = true;
+    while (changed && this.quarantine.size) {
+      changed = false;
+      const ok = [...this.quarantine.values()].filter((e) => this.isAdmin(e.a) && !this.state.banned.has(e.a));
+      if (!ok.length) break;
+      for (const e of ok) {
+        this.quarantine.delete(e.id);
+        this.events.set(e.id, e);
+      }
+      await db.putEvents(ok);
+      this.invalidate();
+      changed = true;
+    }
+  }
+
   private markDelivered() {
-    if (!Object.keys(this.peers).length) return;
+    if (!this.memberPeers().length || !this.isMember()) return;
     const pend = [...this.events.values()].filter((e) => e.pending);
     if (!pend.length) return;
     for (const e of pend) delete e.pending;
     db.putEvents(pend);
-    this.act.ev.send(pend.map(stripLocal));
+    this.toMembers((target) => this.act.ev.send(pend.map(stripLocal), { target }));
     this.invalidate();
   }
 
@@ -468,6 +659,7 @@ export class Session {
       const theirs = new Set(ids);
       for (const e of this.events.values()) if (dayKey(e.ts) === d && !theirs.has(e.id)) send.push(stripLocal(e));
     }
+    send.sort((x, y) => x.ts - y.ts);
     for (let i = 0; i < send.length; i += 300) this.act.ev.send(send.slice(i, i + 300), { target: peerId });
     this.markDelivered();
   }
@@ -498,7 +690,7 @@ export class Session {
     const now = Date.now();
     if (now - this.lastTypingSent < 3000) return;
     this.lastTypingSent = now;
-    this.act.typing.send({ ch });
+    this.toMembers((target) => this.act.typing.send({ ch }, { target }));
   }
   private onTyping(peerId: string, ch: string) {
     const pub = this.peers[peerId]?.pub;
@@ -544,7 +736,7 @@ export class Session {
     this.blobsLoading.add(att.id);
     this.ctx.emit();
     try {
-      const ids = Object.keys(this.peers).sort((a) => (a === prefer ? -1 : 1));
+      const ids = this.memberPeers().sort((a) => (a === prefer ? -1 : 1));
       for (const id of ids) {
         try {
           const raw = (await this.act.blob.request({ id: att.id }, { target: id, timeoutMs: 120000 })) as ArrayBuffer | ArrayBufferView | null;
@@ -592,6 +784,19 @@ export class Session {
       const pid = this.peerIdOf(user);
       if (pid) this.room.getPeers()[pid]?.close();
     }
+  }
+  /** Aprovar (ou recusar) a entrada de alguém. Recusar = banir. */
+  async admit(user: string, on: boolean) {
+    if (on) await this.publish({ k: "admit", user, on: true });
+    else await this.ban(user, true);
+  }
+  /** Liga/desliga a aprovação de novos membros. Ao ligar, quem já participa é aprovado automaticamente. */
+  async setApproval(on: boolean) {
+    if (on) {
+      const st = this.state;
+      for (const pub of Object.keys(this.members)) if (!st.banned.has(pub) && !st.admins.has(pub) && !st.admitted.has(pub)) await this.publish({ k: "admit", user: pub, on: true });
+    }
+    await this.publish({ k: "policy", approval: on });
   }
   /** Convite novo: todo mundo online migra para uma sala nova; o código antigo para de funcionar. */
   async regenerateInvite() {
@@ -973,6 +1178,7 @@ export class Session {
 
   async leave() {
     clearInterval(this.statsTimer);
+    clearInterval(this.resyncTimer);
     this.stopLive();
     this.stopWatching(true);
     this.leaveVoice();

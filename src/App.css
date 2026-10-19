@@ -484,3 +484,21 @@ html.compact .reply-ref { padding-left: 44px; }
 .app.theater .main-head { position: absolute; left: 0; right: 0; top: 0; background: linear-gradient(rgba(0,0,0,.75), transparent); box-shadow: none; opacity: 0; transition: opacity .2s; color: #ddd; }
 .app.theater .main-head:hover, .app.theater .live-view:hover .main-head { opacity: 1; }
 .app.theater .live-view { position: relative; }
+
+/* ---------- segurança ---------- */
+.mono { font-family: Consolas, "Cascadia Code", monospace; word-break: break-all; }
+.row.wrap { flex-wrap: wrap; }
+.banner.warn { background: #3b3220; color: #f0d58a; justify-content: space-between; }
+.member.pending { flex-direction: row; align-items: flex-start; cursor: default; background: rgba(240,178,50,.06); }
+.pending-title { color: var(--yellow); }
+.pending-actions { display: flex; gap: 4px; margin-top: 4px; align-items: center; }
+.pending-actions .btn.small { padding: 3px 8px; font-size: 12px; }
+.waiting-icon { font-size: 56px; }
+.safety-head { display: flex; gap: 12px; align-items: center; }
+.safety-head .mono { font-size: 11px; }
+.safety-number { font-size: 22px; letter-spacing: 1px; text-align: center; background: #1e1f22; border-radius: 8px; padding: 16px; line-height: 1.6; color: var(--text-strong); word-spacing: 6px; }
+.key-box { background: #1e1f22; border-radius: 6px; padding: 10px 12px; font-size: 13px; color: var(--text-strong); word-spacing: 4px; }
+.security-card { display: flex; gap: 14px; background: rgba(35,165,89,.1); border: 1px solid rgba(35,165,89,.35); border-radius: 8px; padding: 14px 16px; color: var(--green); }
+.security-card strong { color: var(--text-strong); }
+.security-card ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.5; }
+.empty.fatal { max-width: 520px; }

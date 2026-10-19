@@ -13,14 +13,29 @@ export type Derived = {
   byId: Map<string, MsgView>;
   admins: Set<string>;
   banned: Set<string>;
+  /** aprovados explicitamente (quando a aprovação de entrada está ligada) */
+  admitted: Set<string>;
+  /** novos membros precisam ser aprovados por um admin */
+  approval: boolean;
   move: { r: string; p: string; ts: number } | null;
 };
+
+/** Quem pode ver e participar do servidor. */
+export function isMemberOf(st: Derived, owner: string, pub: string) {
+  if (st.banned.has(pub)) return false;
+  return !owner || !st.approval || st.admins.has(pub) || st.admitted.has(pub);
+}
 
 export function derive(events: StoredEvent[], owner: string, seed: { name: string; channels: Channel[] }): Derived {
   const sorted = [...events].sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : 1));
   const admins = new Set<string>(owner ? [owner] : []);
   const banned = new Set<string>();
+  const admitted = new Set<string>();
+  let approval = false;
   const isAdmin = (pub: string) => !owner || admins.has(pub);
+  const isMember = (pub: string) => !owner || !approval || admins.has(pub) || admitted.has(pub);
+  // eventos de conteúdo só valem de quem é membro naquele momento
+  const CONTENT = new Set(["msg", "edit", "del", "react"]);
 
   let name = seed.name;
   let nameTs = 0;
@@ -31,6 +46,7 @@ export function derive(events: StoredEvent[], owner: string, seed: { name: strin
   for (const e of sorted) {
     const b = e.b;
     if (banned.has(e.a) && b.k !== "ban") continue;
+    if (CONTENT.has(b.k) && !isMember(e.a)) continue;
     switch (b.k) {
       case "msg":
         if (typeof b.text !== "string" || typeof b.ch !== "string") break;
@@ -100,6 +116,18 @@ export function derive(events: StoredEvent[], owner: string, seed: { name: strin
           nameTs = e.ts;
         }
         break;
+      case "admit":
+        if (isAdmin(e.a) && b.user !== owner) {
+          if (b.on) admitted.add(b.user);
+          else {
+            admitted.delete(b.user);
+            if (e.a === owner) admins.delete(b.user);
+          }
+        }
+        break;
+      case "policy":
+        if (isAdmin(e.a)) approval = !!b.approval;
+        break;
       case "move":
         if (isAdmin(e.a)) move = { r: b.r, p: b.p, ts: e.ts };
         break;
@@ -114,7 +142,7 @@ export function derive(events: StoredEvent[], owner: string, seed: { name: strin
   }
   const channels = [...chans.values()];
   if (!channels.length) channels.push({ id: "geral", name: "geral" });
-  return { name, nameTs, channels, messages, byId, admins, banned, move };
+  return { name, nameTs, channels, messages, byId, admins, banned, admitted, approval, move };
 }
 
 /** Resumo do log por dia, usado para descobrir rapidamente o que falta entre dois peers. */

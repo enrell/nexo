@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { COLORS, app, randomColor, useApp } from "../lib/app";
 import { mediaErrorMessage } from "../lib/rtc";
 import { selfId, type Session } from "../lib/session";
-import { PRESETS, decodeInvite, encodeInvite, inviteLink } from "../lib/storage";
+import { PRESETS, decodeInvite, encodeInvite, inviteLink, storage } from "../lib/storage";
 import type { StreamPreset } from "../lib/types";
 import { Avatar, Icons, Modal } from "./common";
 import { initials } from "./Sidebar";
@@ -108,18 +108,6 @@ export function AddServerModal({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const preview = decodeInvite(code);
-
-  useEffect(() => {
-    navigator.clipboard
-      .readText()
-      .then((t) => {
-        if (decodeInvite(t)) {
-          setCode(t.trim());
-          setTab("join");
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   return (
     <Modal title="Adicionar servidor" onClose={onClose}>
@@ -256,7 +244,7 @@ export function GoLiveModal({ s, onClose }: { s: Session; onClose: () => void })
   const [sel, setSel] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "screens" | "windows">("all");
   const [audio, setAudio] = useState(true);
-  const [title, setTitle] = useState(() => localStorage.getItem("nexo:livetitle") ?? "");
+  const [title, setTitle] = useState(() => storage.get<string>("livetitle", ""));
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -281,7 +269,7 @@ export function GoLiveModal({ s, onClose }: { s: Session; onClose: () => void })
 
   const go = async () => {
     setBusy(true);
-    localStorage.setItem("nexo:livetitle", title);
+    storage.set("livetitle", title);
     try {
       await s.startLive(kind, title, { sourceId: sel ?? undefined, audio });
       a.audio.play("live");

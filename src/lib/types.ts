@@ -60,6 +60,10 @@ export type Settings = {
   closeToTray: boolean;
   launchAtLogin: boolean;
   linkPreviews: boolean;
+  /** mostrar o texto da mensagem nas notificações do Windows */
+  notifyPreview: boolean;
+  /** só conectar via TURN: os outros não veem seu IP (exige TURN configurado) */
+  relayOnly: boolean;
 };
 
 export type Channel = { id: string; name: string };
@@ -87,7 +91,9 @@ export type EventBody =
   | { k: "ban"; user: string; on: boolean; reason?: string }
   | { k: "chan"; id: string; name: string; del?: boolean }
   | { k: "name"; name: string }
-  | { k: "move"; r: string; p: string };
+  | { k: "move"; r: string; p: string }
+  | { k: "admit"; user: string; on: boolean }
+  | { k: "policy"; approval: boolean };
 
 /** Evento assinado: a unidade que é guardada por todos e sincronizada. */
 export type SignedEvent = { id: string; a: string; ts: number; b: EventBody; s: string };

@@ -1,3 +1,5 @@
+// Ponte mínima entre a página (sandbox, sem Node) e o processo principal.
+// Expõe só funções específicas; nada de ipcRenderer genérico.
 const { contextBridge, ipcRenderer } = require("electron");
 
 const on = (channel, cb) => {
@@ -8,9 +10,12 @@ const on = (channel, cb) => {
 
 contextBridge.exposeInMainWorld("nexo", {
   platform: process.platform,
+  debug: ipcRenderer.sendSync("nexo:debug") === true,
   getSources: () => ipcRenderer.invoke("nexo:sources"),
   selectSource: (id, audio) => ipcRenderer.invoke("nexo:select-source", id, audio),
   getPendingUrl: () => ipcRenderer.invoke("nexo:pending-url"),
+  getVaultKey: () => ipcRenderer.invoke("nexo:vault-key"),
+  resetVault: () => ipcRenderer.invoke("nexo:vault-reset"),
   getIdleSeconds: () => ipcRenderer.invoke("nexo:idle"),
   getVersion: () => ipcRenderer.invoke("nexo:version"),
   fetchPreview: (url) => ipcRenderer.invoke("nexo:preview", url),

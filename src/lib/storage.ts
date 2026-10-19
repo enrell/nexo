@@ -1,22 +1,62 @@
 import type { Profile, ServerInfo, Settings } from "./types";
 
-const PREFIX = "nexo:";
+import { openString, sealString } from "./vault";
 
-function read<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(PREFIX + key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
+const PREFIX = "nexo:";
+const cache = new Map<string, unknown>();
+const writes = new Map<string, Promise<void>>();
+
+/**
+ * Armazenamento local cifrado. Na inicialização decifra tudo para a memória;
+ * cada gravação é cifrada (AES-256-GCM, AAD = nome da chave) antes de ir ao disco.
+ * Valores antigos em texto puro são cifrados na hora (migração).
+ */
+export async function initSecureStore() {
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k?.startsWith(PREFIX)) keys.push(k.slice(PREFIX.length));
+  }
+  for (const k of keys) {
+    const raw = localStorage.getItem(PREFIX + k);
+    if (raw == null) continue;
+    try {
+      if (raw.startsWith("v1:")) cache.set(k, JSON.parse(await openString(raw, "ls:" + k)));
+      else {
+        const v = JSON.parse(raw);
+        cache.set(k, v);
+        write(k, v); // migra texto puro → cifrado
+      }
+    } catch (e) {
+      console.warn("registro local ilegível, descartado:", k, e);
+      localStorage.removeItem(PREFIX + k);
+    }
   }
 }
 
+function read<T>(key: string, fallback: T): T {
+  return cache.has(key) ? (structuredClone(cache.get(key)) as T) : fallback;
+}
+
 function write(key: string, value: unknown) {
-  try {
-    localStorage.setItem(PREFIX + key, JSON.stringify(value));
-  } catch (e) {
-    console.warn("falha ao salvar", key, e);
-  }
+  cache.set(key, structuredClone(value));
+  const json = JSON.stringify(value);
+  // grava em ordem por chave, mesmo com cifragem assíncrona
+  const prev = writes.get(key) ?? Promise.resolve();
+  const next = prev
+    .then(async () => localStorage.setItem(PREFIX + key, await sealString(json, "ls:" + key)))
+    .catch((e) => console.warn("falha ao salvar", key, e));
+  writes.set(key, next);
+}
+
+function remove(key: string) {
+  cache.delete(key);
+  localStorage.removeItem(PREFIX + key);
+}
+
+/** Espera todas as gravações pendentes (antes de recarregar o app). */
+export async function flushSecureStore() {
+  await Promise.all(writes.values());
 }
 
 export const defaultSettings: Settings = {
@@ -55,7 +95,10 @@ export const defaultSettings: Settings = {
   relayUrls: "",
   closeToTray: true,
   launchAtLogin: false,
-  linkPreviews: true,
+  // seguro por padrão: nada que vaze seu IP para sites de terceiros sem você pedir
+  linkPreviews: false,
+  notifyPreview: false,
+  relayOnly: false,
 };
 
 export const PRESETS: Record<Exclude<Settings["preset"], "custom">, Pick<Settings, "quality" | "bitrate" | "streamSlots">> = {
@@ -82,15 +125,10 @@ export const storage = {
       joinedAt: s.joinedAt ?? Date.now(),
     })),
   saveServers: (s: ServerInfo[]) => write("servers", s),
-  removeLegacyMessages: (roomId: string) => {
-    try {
-      localStorage.removeItem(PREFIX + "msgs:" + roomId);
-    } catch {
-      /* ignore */
-    }
-  },
+  removeLegacyMessages: (roomId: string) => remove("msgs:" + roomId),
   get: read,
   set: write,
+  remove,
 };
 
 export function randomId(len = 16): string {
