@@ -12,9 +12,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const tmp = path.join(os.tmpdir(), "nexo-e2e");
-fs.rmSync(tmp, { recursive: true, force: true });
-fs.mkdirSync(tmp, { recursive: true });
+// diretório temporário exclusivo e imprevisível
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nexo-e2e-"));
 const exe = path.join(root, "node_modules/electron/dist", process.platform === "win32" ? "electron.exe" : "electron");
 
 const t0 = Date.now();

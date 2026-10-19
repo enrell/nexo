@@ -25,6 +25,11 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Binário do Electron
+        shell: bash
+        run: |
+          node node_modules/electron/install.js
+          test -f node_modules/electron/dist/electron.exe && echo "electron.exe ok"
       - name: Typecheck e build
         run: npm run build
       - name: Auditoria das dependências de produção
@@ -32,6 +37,8 @@ jobs:
       - name: Teste ponta a ponta (várias instâncias reais via P2P)
         shell: bash
         # depende de relays públicos; uma nova tentativa evita falso negativo por rede
+        env:
+          DEBUG: pw:browser
         run: node tests/e2e.mjs || node tests/e2e.mjs
       - name: Instalador (sem publicar)
         run: npx electron-builder --win --publish never

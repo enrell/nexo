@@ -37,11 +37,18 @@ jobs:
           echo "Notas da release:"; cat release-notes.md
 
       - run: npm ci
+      - name: Binário do Electron
+        shell: bash
+        run: |
+          node node_modules/electron/install.js
+          test -f node_modules/electron/dist/electron.exe && echo "electron.exe ok"
       - run: npm run build
       - name: Auditoria das dependências de produção
         run: npm audit --omit=dev --audit-level=high
       - name: Teste ponta a ponta
         shell: bash
+        env:
+          DEBUG: pw:browser
         run: node tests/e2e.mjs || node tests/e2e.mjs
 
       - name: Gerar e publicar instalador (release em rascunho)

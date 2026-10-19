@@ -167,13 +167,20 @@ const vaultFile = () => path.join(app.getPath("userData"), "vault.key");
 function loadVaultKey() {
   if (!safeStorage.isEncryptionAvailable()) throw new Error("O sistema não oferece armazenamento seguro de chaves (DPAPI/Keychain/libsecret).");
   const file = vaultFile();
-  if (fs.existsSync(file)) {
-    const key = safeStorage.decryptString(fs.readFileSync(file));
+  let sealed = null;
+  try {
+    sealed = fs.readFileSync(file);
+  } catch (e) {
+    if (e.code !== "ENOENT") throw e;
+  }
+  if (sealed) {
+    const key = safeStorage.decryptString(sealed);
     if (!/^[A-Za-z0-9+/]{43}=$/.test(key)) throw new Error("Cofre corrompido.");
     return key;
   }
   const key = crypto.randomBytes(32).toString("base64");
-  fs.writeFileSync(file, safeStorage.encryptString(key), { mode: 0o600 });
+  // "wx": falha se o arquivo aparecer no meio do caminho (nunca sobrescreve um cofre existente)
+  fs.writeFileSync(file, safeStorage.encryptString(key), { mode: 0o600, flag: "wx" });
   return key;
 }
 
@@ -521,11 +528,12 @@ async function fetchPreview(url) {
 }
 
 function decode(s) {
+  // &amp; por último: "&amp;lt;" vira "&lt;" (texto), não "<"
   return String(s)
-    .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
     .trim();
 }
