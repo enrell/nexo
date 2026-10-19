@@ -122,7 +122,7 @@ gh run watch "$(gh run list --workflow release --limit 1 --json databaseId -q '.
 gh release view vX.Y.Z --json isDraft,isLatest,assets -q '{draft: .isDraft, latest: .isLatest, assets: [.assets[].name]}'
 ```
 
-Tem que estar `draft: false`, `latest: true` e conter: `Nexo-Setup-X.Y.Z.exe`, `Nexo-Setup-X.Y.Z.exe.blockmap`, `latest.yml` e `SHA256SUMS.txt`. Verifique o atestado:
+Tem que existir **uma única** release para a tag (`gh api repos/enrell/nexo/releases --jq '[.[] | select(.tag_name=="vX.Y.Z")] | length'` → `1`). Ela tem que estar `draft: false` e `latest: true`, e conter: `Nexo-Setup-X.Y.Z.exe`, `Nexo-Setup-X.Y.Z.exe.blockmap`, `latest.yml` e `SHA256SUMS.txt`. Verifique o atestado:
 
 ```bash
 gh release download vX.Y.Z -p 'Nexo-Setup-*.exe' -D "$TMP/nexo-rel" --clobber
@@ -136,6 +136,7 @@ gh attestation verify "$TMP/nexo-rel/Nexo-Setup-X.Y.Z.exe" -R enrell/nexo
   gh release delete vX.Y.Z --yes --cleanup-tag   # só se ainda for rascunho!
   git tag -d vX.Y.Z
   ```
+- **Duas releases para a mesma tag** (uma publicada sem o `.exe`/`latest.yml` e um rascunho com eles): baixe os arquivos do rascunho pela API (`gh api -H "Accept: application/octet-stream" repos/enrell/nexo/releases/assets/<id> > arquivo`), confira com o `SHA256SUMS.txt` e com `gh attestation verify`, apague o rascunho (`gh api -X DELETE repos/enrell/nexo/releases/<id>`) e envie os arquivos para a publicada (`gh release upload vX.Y.Z ...`). O workflow já cria o rascunho antes do electron-builder para evitar isso.
 - **A release já foi publicada**: não apague nem mova a tag (os apps podem já ter baixado). Corrija e lance `X.Y.(Z+1)`.
 
 ## 11. Avisar o usuário

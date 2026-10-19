@@ -51,6 +51,14 @@ jobs:
           DEBUG: pw:browser
         run: node tests/e2e.mjs || node tests/e2e.mjs
 
+      # o rascunho precisa existir ANTES do electron-builder: sem ele, os envios em paralelo
+      # criam uma release cada (aconteceu na v0.3.0)
+      - name: Criar a release em rascunho
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --draft --verify-tag --title "Nexo $GITHUB_REF_NAME" --notes-file release-notes.md
+
       - name: Gerar e publicar instalador (release em rascunho)
         run: npx electron-builder --win --publish always
         env:
@@ -70,6 +78,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # exatamente uma release para a tag, com instalador e latest.yml (senão o auto-update quebra)
+          COUNT=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq "[.[] | select(.tag_name == \"$GITHUB_REF_NAME\")] | length")
+          if [ "$COUNT" != "1" ]; then echo "::error::$COUNT releases para $GITHUB_REF_NAME"; exit 1; fi
+          ASSETS=$(gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name] | join(" ")')
+          for f in "Nexo-Setup-${GITHUB_REF_NAME#v}.exe" latest.yml; do
+            case " $ASSETS " in *" $f "*) ;; *) echo "::error::falta $f na release"; exit 1;; esac
+          done
           gh release upload "$GITHUB_REF_NAME" release/SHA256SUMS.txt --clobber -R "$GITHUB_REPOSITORY"
           {
             cat release-notes.md
