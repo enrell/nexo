@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Typecheck e build
+        run: npm run build
+      - name: Auditoria das dependências de produção
+        run: npm audit --omit=dev --audit-level=high
+      - name: Teste ponta a ponta (várias instâncias reais via P2P)
+        shell: bash
+        # depende de relays públicos; uma nova tentativa evita falso negativo por rede
+        run: node tests/e2e.mjs || node tests/e2e.mjs
+      - name: Instalador (sem publicar)
+        run: npx electron-builder --win --publish never
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: Nexo-Setup-${{ github.sha }}
+          path: release/*.exe
+          retention-days: 14
