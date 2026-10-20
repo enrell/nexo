@@ -40,6 +40,7 @@ export function memberMenu(s: Session, pub: string): MenuItem[] {
       }
     },
   });
+  items.push({ label: me ? "Meu perfil" : "Ver perfil", onClick: () => app.openCtx("profile", pub) });
   if (!me) items.push({ label: "Verificar identidade", onClick: () => openSafety(s, pub), icon: <Icons.Shield size={16} /> });
   items.push({ label: "Copiar ID do usuário", onClick: () => navigator.clipboard.writeText(pub), icon: <Icons.Copy size={16} /> });
   if (!me && s.isAdmin() && !s.isMember(pub) && !s.state.banned.has(pub)) {
@@ -64,7 +65,7 @@ export function memberMenu(s: Session, pub: string): MenuItem[] {
   return items;
 }
 
-export function Members({ s }: { s: Session }) {
+export function MembersList({ s }: { s: Session }) {
   const a = useApp();
   const me = a.effectiveProfile();
   type Row = { pub: string; peerId: string; name: string; color: string; avatar?: string; status: "online" | "idle" | "dnd" | "offline"; live: boolean; voice: boolean; rtt?: number; relayed?: boolean; lastSeen?: number };
@@ -100,13 +101,13 @@ export function Members({ s }: { s: Session }) {
     <div
       key={r.pub}
       className={"member" + (r.status === "offline" ? " offline" : "")}
-      onClick={(e) => (r.live ? a.openLive(r.peerId) : openMenu(e, memberMenu(s, r.pub)))}
+      onClick={() => a.openCtx("profile", r.pub)}
       onContextMenu={(e) => openMenu(e, memberMenu(s, r.pub))}
     >
       <Avatar name={r.name} color={r.color} src={r.avatar} size={32} status={r.status} speaking={r.voice && a.isSpeaking(r.pub)} />
       <div className="member-info">
         <div className="member-name">
-          <span className="ellipsis" style={{ color: r.status === "offline" ? undefined : r.color }}>
+          <span className="ellipsis">
             {r.name}
           </span>
           {role(r.pub) === "owner" && (
@@ -134,28 +135,37 @@ export function Members({ s }: { s: Session }) {
   );
 
   return (
-    <aside className="members">
+    <div className="members-list">
       {pending.length > 0 && (
         <>
           <div className="section-title pending-title">
             <span>Pedindo para entrar — {pending.length}</span>
           </div>
           {pending.map(([id, p]) => (
-            <div key={id} className="member pending" onContextMenu={(e) => openMenu(e, memberMenu(s, p.pub))}>
+            <div key={id} className="member pending" onClick={() => a.openCtx("profile", p.pub)} onContextMenu={(e) => openMenu(e, memberMenu(s, p.pub))}>
               <Avatar name={p.profile!.name} color={p.profile!.color} src={p.profile!.avatar} size={32} />
               <div className="member-info">
                 <div className="member-name">
                   <span className="ellipsis">{s.profileOf(p.pub).name}</span>
                 </div>
                 <div className="pending-actions">
-                  <button className="btn small" onClick={() => s.admit(p.pub, true)}>
+                  <button
+                    className="btn small warnbtn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      s.admit(p.pub, true);
+                    }}
+                  >
                     Aprovar
                   </button>
-                  <button className="btn ghost small" onClick={() => confirm(`Recusar e banir ${p.profile!.name}?`) && s.admit(p.pub, false)}>
+                  <button
+                    className="btn ghost small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (confirm(`Recusar e banir ${p.profile!.name}?`)) s.admit(p.pub, false);
+                    }}
+                  >
                     Recusar
-                  </button>
-                  <button className="icon-btn tiny" title="Verificar identidade" onClick={() => openSafety(s, p.pub)}>
-                    <Icons.Shield size={14} />
                   </button>
                 </div>
               </div>
@@ -183,6 +193,6 @@ export function Members({ s }: { s: Session }) {
           {offline.map(row)}
         </>
       )}
-    </aside>
+    </div>
   );
 }

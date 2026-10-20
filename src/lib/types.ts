@@ -46,8 +46,14 @@ export type Settings = {
   uiSounds: boolean;
   // aparência
   fontScale: number; // %
-  compact: boolean;
   zoom: number; // %
+  // tema (Constelação)
+  themeAccent: string; // id da paleta de destaque
+  themeBg: string; // id do fundo ou "custom" (imagem do usuário, guardada cifrada)
+  panelAlpha: number; // 55..100 (% de opacidade dos painéis)
+  radius: number; // px
+  density: "compact" | "normal" | "airy";
+  ctxCollapsed: boolean; // painel contextual (direita) recolhido
   // atalhos globais (Electron accelerator)
   keyMute: string;
   keyDeafen: string;

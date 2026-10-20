@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nexo · direções visuais</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root { --bg:#0e0e11; --card:#17171c; --line:#26262d; --text:#ececf1; --dim:#9a9aa6; }
+  * { box-sizing:border-box }
+  body { margin:0; min-height:100vh; background:radial-gradient(1200px 600px at 20% -10%, #2a2340 0, transparent 60%), var(--bg); color:var(--text); font:15px/1.5 Inter, system-ui, sans-serif; }
+  main { max-width:1180px; margin:0 auto; padding:56px 24px 80px; }
+  header { display:flex; align-items:center; gap:14px; margin-bottom:8px }
+  header .logo { width:44px; height:44px; border-radius:13px; background:linear-gradient(135deg,#7983ff,#4450d6); display:grid; place-items:center; font-weight:700; font-size:20px }
+  h1 { margin:0; font-size:30px; letter-spacing:-.02em }
+  .lead { color:var(--dim); max-width:720px; margin:6px 0 36px }
+  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:18px; overflow:hidden; display:flex; flex-direction:column; transition:transform .15s, border-color .15s }
+  .card:hover { transform:translateY(-3px); border-color:#3a3a46 }
+  .thumb { height:210px; position:relative; overflow:hidden }
+  .body { padding:18px 20px 20px; display:flex; flex-direction:column; gap:10px; flex:1 }
+  .body h2 { margin:0; font-size:19px }
+  .body p { margin:0; color:var(--dim); font-size:14px }
+  .tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px }
+  .tags span { font-size:12px; padding:3px 9px; border-radius:999px; background:#22222a; color:#c8c8d2 }
+  .btn { margin-top:auto; display:flex; align-items:center; justify-content:center; gap:8px; padding:11px 14px; border-radius:11px; background:#ececf1; color:#111; font-weight:600; text-decoration:none }
+  .btn:hover { background:#fff }
+  .hero { display:grid; grid-template-columns: 360px 1fr; gap: 24px; align-items:center; background: var(--card); border:1px solid #3a3a46; border-radius:18px; padding:18px; margin-bottom:22px; color:inherit; text-decoration:none; }
+  .hero:hover { border-color:#5b5b70 }
+  .hero h2 { margin:6px 0 6px; font-size:22px } .hero p { margin:0; color:var(--dim); font-size:14px }
+  .newtag { font-size:11px; font-weight:700; letter-spacing:.06em; color:#0b0b18; background:linear-gradient(135deg,#a78bfa,#22d3ee); padding:3px 8px; border-radius:999px }
+  .hero-thumb { position:relative; height:200px; border-radius:14px; overflow:hidden; background: radial-gradient(circle at 20% 10%, rgba(124,58,237,.5), transparent 55%), radial-gradient(circle at 90% 90%, rgba(8,145,178,.45), transparent 50%), #05060d }
+  .hero-thumb .hb { position:absolute; left:10px; right:10px; top:10px; height:26px; border-radius:9px; background:rgba(17,18,34,.92) }
+  .hero-thumb .hc { position:absolute; left:10px; top:44px; bottom:10px; width:60px; border-radius:9px; background:rgba(17,18,34,.92) }
+  .hero-thumb .hd { position:absolute; left:78px; right:86px; top:44px; bottom:10px; border-radius:9px; background:rgba(17,18,34,.92); border:1px solid rgba(255,255,255,.08) }
+  .hero-thumb::after { content:""; position:absolute; right:10px; top:44px; bottom:10px; width:68px; border-radius:9px; background:rgba(17,18,34,.92) }
+  footer { margin-top:36px; color:var(--dim); font-size:13px; display:flex; gap:16px; align-items:center }
+  kbd { background:#22222a; border:1px solid #33333d; border-bottom-width:2px; padding:1px 6px; border-radius:5px; font:12px "JetBrains Mono", monospace }
+
+  /* miniaturas */
+  .t-sala { background:#f4eee4 }
+  .t-sala .bar { position:absolute; inset:0 0 auto 0; height:26px; background:#ebe2d3; display:flex; gap:6px; align-items:center; padding:0 10px }
+  .t-sala .bar i { width:14px; height:14px; border-radius:50%; background:#c9643f; display:block }
+  .t-sala .bar i:nth-child(2){ background:#6d7f4f } .t-sala .bar i:nth-child(3){ background:#d8b37a }
+  .t-sala .live { position:absolute; left:14px; top:40px; width:58%; height:96px; border-radius:16px; background:linear-gradient(135deg,#c9643f,#e6a162) }
+  .t-sala .live::after { content:"AO VIVO"; position:absolute; left:10px; top:10px; font:700 9px Inter; color:#fff; background:rgba(0,0,0,.25); padding:3px 6px; border-radius:6px }
+  .t-sala .voice { position:absolute; left:14px; top:148px; display:flex; gap:8px }
+  .t-sala .voice b { width:34px; height:34px; border-radius:50%; background:#6d7f4f; box-shadow:0 0 0 3px #f4eee4, 0 0 0 5px #6d7f4f }
+  .t-sala .voice b:nth-child(2){ background:#c9643f; box-shadow:none } .t-sala .voice b:nth-child(3){ background:#a88c6a; box-shadow:none }
+  .t-sala .chat { position:absolute; right:12px; top:40px; bottom:14px; width:30%; border-radius:14px; background:#fffaf2; box-shadow:0 2px 0 #e6dccb }
+  .t-sala .chat::before, .t-sala .chat::after { content:""; position:absolute; left:10px; right:18px; height:10px; border-radius:6px; background:#efe5d6; top:14px }
+  .t-sala .chat::after { top:32px; right:34px }
+
+  .t-con { background:radial-gradient(circle at 30% 20%, #3b2a7a 0, transparent 50%), radial-gradient(circle at 80% 80%, #0b5a6b 0, transparent 45%), #07070f }
+  .t-con .stars { position:absolute; inset:0; background-image:radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 15%, #fff, transparent), radial-gradient(1px 1px at 40% 80%, #fff, transparent), radial-gradient(1px 1px at 85% 55%, #fff, transparent); opacity:.6 }
+  .t-con .rail { position:absolute; left:12px; top:20px; bottom:20px; width:34px; border-radius:20px; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12); display:flex; flex-direction:column; align-items:center; gap:8px; padding-top:8px }
+  .t-con .rail b { width:20px; height:20px; border-radius:50%; background:linear-gradient(135deg,#a78bfa,#22d3ee) }
+  .t-con .rail b:nth-child(n+2){ background:rgba(255,255,255,.18) }
+  .t-con .panel { position:absolute; left:58px; right:12px; top:20px; bottom:20px; border-radius:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12) }
+  .t-con .msg { position:absolute; left:78px; top:46px; width:46%; height:34px; border-radius:12px; background:rgba(255,255,255,.1) }
+  .t-con .msg.me { left:auto; right:30px; top:92px; background:linear-gradient(90deg,rgba(167,139,250,.5),rgba(34,211,238,.45)) }
+  .t-con .orb { position:absolute; right:40px; top:140px; width:30px; height:30px; border-radius:50%; background:#a78bfa; box-shadow:0 0 18px #a78bfa }
+  .t-con .orb.b { right:80px; top:150px; width:22px; height:22px; background:#22d3ee; box-shadow:0 0 14px #22d3ee }
+
+  .t-ed { background:#12110f; font:500 10px/1.7 "JetBrains Mono", monospace; color:#ece4d4; padding:14px 16px }
+  .t-ed .l { color:#c6f432 } .t-ed .d { color:#7b7466 }
+  .t-ed .line { border-top:1px solid #2c2a25; margin:6px 0 }
+</style>
+</head>
+<body>
+<main>
+  <header><div class="logo">N</div><h1>Nexo: três direções visuais</h1></header>
+  <p class="lead">Protótipos estáticos em HTML com dados de exemplo e ícones Phosphor. Nenhum deles copia o layout do Discord. Abra cada um, compare e me diga qual seguir (ou o que misturar).</p>
+
+  <a class="hero" href="constelacao3.html">
+    <div class="hero-thumb"><div class="hb"></div><div class="hc"></div><div class="hd"></div></div>
+    <div>
+      <span class="newtag">NOVA · layout refeito</span>
+      <h2>5 · Constelação 3</h2>
+      <p>Uma grade só: o topo usa as mesmas colunas do corpo — <b>você</b> (perfil, microfone, fone) em cima dos canais, <b>servidores</b> em cima do chat e <b>busca</b> em cima da coluna direita. O nome do servidor virou o cabeçalho dos canais. A coluna direita é um <b>painel contextual</b>: clique num nome, em “Membros”, na busca ou em Personalizar (menu ⋯) e ele troca de conteúdo no lugar, sem janelas flutuantes.</p>
+      <span class="btn" style="display:inline-flex;margin-top:12px">Ver Constelação 3 <i class="ph ph-arrow-right"></i></span>
+      <a href="constelacao2.html" style="margin-left:14px;color:var(--dim);font-size:13px">comparar com a 2 →</a>
+    </div>
+  </a>
+
+  <div class="grid">
+    <article class="card">
+      <div class="thumb t-sala"><div class="bar"><i></i><i></i><i></i></div><div class="live"></div><div class="voice"><b></b><b></b><b></b></div><div class="chat"></div></div>
+      <div class="body">
+        <h2>1 · Sala de estar</h2>
+        <p>O “agora” em destaque: quem está ao vivo, quem está na voz e quem está online formam a tela inicial do servidor. O chat fica ao lado, como uma conversa paralela.</p>
+        <div class="tags"><span>tema claro e quente</span><span>areia · terracota · musgo</span><span>arredondado</span></div>
+        <a class="btn" href="sala.html">Ver Sala de estar <i class="ph ph-arrow-right"></i></a>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumb t-con"><div class="stars"></div><div class="rail"><b></b><b></b><b></b></div><div class="panel"></div><div class="msg"></div><div class="msg me"></div><div class="orb"></div><div class="orb b"></div></div>
+      <div class="body">
+        <h2>2 · Constelação</h2>
+        <p>Painéis de vidro fosco flutuando sobre o espaço. Servidores são planetas, mensagens são cartões e quem está na voz aparece como bolhas que brilham ao falar.</p>
+        <div class="tags"><span>escuro</span><span>violeta → ciano</span><span>vidro</span><span>marcante</span></div>
+        <a class="btn" href="constelacao.html">Ver Constelação <i class="ph ph-arrow-right"></i></a>
+      </div>
+    </article>
+    <article class="card">
+      <div class="thumb t-ed">
+        <div><span class="l">NEXO</span> ─ os brabos / #geral <span class="d">· 14 online</span></div>
+        <div class="line"></div>
+        <div><span class="d">21:03</span> rafa&nbsp;&nbsp;&nbsp;bora live hoje?</div>
+        <div><span class="d">21:03</span> rafa&nbsp;&nbsp;&nbsp;vou de valorant</div>
+        <div><span class="d">21:04</span> <span class="l">enrell</span> já abri a sala</div>
+        <div class="line"></div>
+        <div><span class="l">■</span> rafa · valorant · 3 assistindo</div>
+        <div class="d">&gt; _&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ctrl+k</div>
+      </div>
+      <div class="body">
+        <h2>3 · Editorial</h2>
+        <p>A tipografia manda. Fundo quase preto quente, texto creme e um único acento verde-limão. Denso, rápido e pensado para quem usa o teclado.</p>
+        <div class="tags"><span>escuro quente</span><span>monoespaçado</span><span>cantos retos</span><span>teclado</span></div>
+        <a class="btn" href="editorial.html">Ver Editorial <i class="ph ph-arrow-right"></i></a>
+      </div>
+    </article>
+  </div>
+  <footer><span>Dentro de cada protótipo: <kbd>←</kbd> <kbd>→</kbd> trocam de direção, <kbd>Esc</kbd> volta para cá.</span></footer>
+</main>
+</body>
+</html>

@@ -60,7 +60,7 @@ const peers = (P) => P.ev(() => Object.values(window.__nexo.session?.peers ?? {}
 const sessionEval = (P, fn, arg) => P.ev(new Function("arg", `const s = window.__nexo.session; return (${fn.toString()})(s, arg);`), arg);
 
 async function joinWithCode(P, code) {
-  await P.page.locator(".rail-btn.add").click();
+  await P.page.locator(".planet.add").click();
   await P.page.getByRole("button", { name: "Entrar com convite" }).click();
   await P.page.locator(".modal textarea").fill(code);
   await P.page.getByRole("button", { name: "Entrar", exact: true }).click();
@@ -76,10 +76,10 @@ try {
   const A = await launch("Alice");
 
   await step("dono cria servidor e pega convite", async () => {
-    await A.page.locator(".rail-btn.add").click();
+    await A.page.locator(".planet.add").click();
     await A.page.getByRole("button", { name: "Criar servidor" }).click();
     await A.page.locator(".side-head").click();
-    await A.page.getByRole("button", { name: "Convidar amigos" }).click();
+    await A.page.getByRole("menuitem", { name: "Convidar amigos" }).click();
     code = await A.page.locator(".invite-box code").nth(1).innerText();
     await A.page.keyboard.press("Escape");
     if (!code.startsWith("nexo-")) throw new Error("código inválido " + code);
@@ -106,7 +106,7 @@ try {
     await B.page.getByText("primeira mensagem").waitFor({ timeout: 20000 });
     await B.page.locator("strong", { hasText: "terceira" }).waitFor({ timeout: 10000 });
     await wait(A, () => document.querySelectorAll(".msg.pending").length === 0, null, 15000);
-    const name = await B.page.locator(".side-head .ellipsis").innerText();
+    const name = await B.page.locator(".srv-txt b").innerText();
     if (!name.includes("Alice")) throw new Error("nome do servidor não sincronizou: " + name);
   });
 
@@ -179,14 +179,14 @@ try {
   await step("voz entre três pessoas (microfone falso)", async () => {
     for (const P of [A, B, C]) await P.page.locator(".chan", { hasText: "Sala de voz" }).click();
     for (const P of [A, B, C]) await wait(P, () => window.__nexo.session.voicePeers.size === 2, null, 20000);
-    await B.page.locator(".user-panel .icon-btn").first().click(); // mutar
+    await B.page.locator(".you .ibtn").first().click(); // mutar
     await wait(A, () => Object.values(window.__nexo.session.peers).some((p) => p.profile?.name === "Bob" && p.muted));
   });
 
   await step("live de câmera com árvore de retransmissão", async () => {
     await A.ev(() => window.__nexo.setSettings({ ...window.__nexo.settings, streamSlots: 1, preset: "custom", quality: "720p30" }));
-    await A.page.getByRole("button", { name: "Transmitir" }).click();
-    await A.page.getByRole("button", { name: /Câmera/ }).click();
+    await A.page.getByRole("button", { name: "Transmitir", exact: true }).click();
+    await A.page.locator(".modal .tabs button", { hasText: "Câmera" }).click();
     await A.page.getByRole("button", { name: "Ficar ao vivo" }).click();
     await A.page.locator(".stage-video").waitFor({ timeout: 15000 });
     for (const P of [B, C]) {
@@ -305,13 +305,17 @@ try {
     if (!out.samePub) throw new Error("backup não restaura a mesma identidade");
   });
 
-  await step("configurações e troca rápida (Ctrl+K) abrem", async () => {
-    await A.page.locator('.user-panel button[title="Configurações"]').click();
+  await step("configurações e busca global (Ctrl+K) funcionam", async () => {
+    await A.page.locator(".you .ibtn").last().click(); // menu ⋯
+    await A.page.getByRole("menuitem", { name: "Configurações" }).click();
     await A.page.getByRole("button", { name: "Voz e vídeo" }).click();
     await A.page.getByText("Modo de entrada").waitFor();
     await A.page.keyboard.press("Escape");
     await A.page.keyboard.press("Control+k");
-    await A.page.locator(".switcher input").waitFor();
+    const focused = await A.ev(() => document.activeElement?.closest(".search") !== null);
+    if (!focused) throw new Error("Ctrl+K não focou a busca");
+    await A.page.keyboard.type("geral");
+    await A.page.locator(".ctx .res", { hasText: "#geral" }).waitFor();
     await A.page.keyboard.press("Escape");
   });
 } catch {

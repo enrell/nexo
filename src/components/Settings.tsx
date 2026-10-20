@@ -6,9 +6,9 @@ import { mediaErrorMessage } from "../lib/rtc";
 import type { Session } from "../lib/session";
 import { PRESETS, encodeInvite, flushSecureStore, inviteLink, storage } from "../lib/storage";
 import type { Codec, Quality, Settings, StreamPreset } from "../lib/types";
-import { Avatar, Icons, Modal, Toggle, lastSeenLabel } from "./common";
+import { Avatar, Icons, Modal, Toggle, keyLabel, lastSeenLabel } from "./common";
 import { openSafety } from "./Safety";
-import { keyLabel } from "./Sidebar";
+import { ThemeEditor } from "./Theme";
 
 type Section = { id: string; label: string; group: string; render: () => ReactNode };
 
@@ -128,7 +128,8 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           <Field label={`Zoom da interface: ${st.zoom}%`}>
             <input type="range" min={70} max={150} step={5} value={st.zoom} onChange={(e) => set({ zoom: +e.target.value })} />
           </Field>
-          <Toggle label="Modo compacto" hint="Mensagens mais juntas, avatares menores." checked={st.compact} onChange={(v) => set({ compact: v })} />
+          <h3>Tema</h3>
+          <ThemeEditor />
         </>
       ),
     },

@@ -42,12 +42,13 @@ Releases saem **só pelo GitHub Actions**, a partir de uma tag `vX.Y.Z`: o pipel
 
 ## O que tem
 
+- **Interface "Constelação"**: grade de 3 colunas com o topo alinhado (você · servidores · busca), servidores como planetas, chat em balões e um painel contextual à direita que troca de conteúdo no lugar (agora, perfil, membros, busca, personalização). Personalizável: cores, fundo (inclusive imagem sua, guardada cifrada), opacidade dos painéis, cantos e densidade. Ícones [Phosphor](https://phosphoricons.com).
 - **Chat**: markdown (negrito, itálico, código, spoiler, citação), @menções com notificação, responder, editar (↑), apagar, reações, emojis, imagens e arquivos de até 25 MB (colar, arrastar ou clipe), prévia de links e YouTube, "digitando…", divisor de novas mensagens, busca no canal, mensagens pendentes quando ninguém está online.
 - **Voz**: escolha de microfone, saída e câmera, teste de microfone, volume de entrada e saída, detecção de voz automática ou manual, **push-to-talk global** (funciona dentro do jogo, aceita botões laterais do mouse), supressão de ruído, eco e ganho, anel verde em quem fala, volume individual por pessoa (0–200%), "mutar para mim", sons de entrar, sair e mutar.
 - **Live**: tela, janela ou câmera com áudio do PC, presets de qualidade, codec por placa de vídeo (H.264), miniatura ao passar o mouse, lista de espectadores, modo teatro (T), tela cheia (F), janela flutuante, estatísticas, retransmissão em árvore entre espectadores.
 - **Moderação**: aprovação de novos membros (ligada por padrão), o dono nomeia admins, admins banem (o banido é recusado por todos), gerenciam canais e renovam o convite.
 - **Segurança**: dados locais cifrados (AES-256-GCM, chave protegida pelo Windows), mensagens assinadas (Ed25519), handshake com channel binding contra intermediário, verificação de identidade por número de segurança, backup da conta com senha, prévias de link e conteúdo de notificação desligados por padrão. Detalhes em [SECURITY.md](SECURITY.md).
-- **Sistema**: instalador de um clique, atualização automática, links `nexo://join/...` que abrem o app, bandeja (fechar mantém a voz), atalhos globais de mutar e ensurdecer, ausente automático, notificações do Windows, contador na barra de tarefas, Ctrl+K para trocar de servidor ou canal, backup e restauração da conta, exportar diagnóstico.
+- **Sistema**: instalador de um clique, atualização automática, links `nexo://join/...` que abrem o app, bandeja (fechar mantém a voz), atalhos globais de mutar e ensurdecer, ausente automático, notificações do Windows, contador na barra de tarefas, busca global com Ctrl+K (canais, pessoas, lives e mensagens), backup e restauração da conta, exportar diagnóstico.
 
 ## Como funciona sem servidor
 

@@ -6,6 +6,21 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+### Alterado
+- Interface nova, "Constelação": uma grade de 3 colunas com o topo alinhado (você · servidores · busca), servidores como planetas numa barra horizontal, nome do servidor no topo da coluna de canais e mensagens em balões.
+- Painel contextual à direita: "Agora" (órbita da sala de voz, lives, tripulação) e, no mesmo lugar, perfil, membros, busca, personalização e notificações, sem janelas flutuantes.
+- Busca global no topo (Ctrl+K) com canais, pessoas, lives e mensagens, no lugar da troca rápida.
+- Ícones Phosphor no lugar dos desenhados à mão; fontes Inter e Space Grotesk empacotadas no app.
+
+### Adicionado
+- Personalização: 6 cores de destaque, 6 fundos e imagem própria, opacidade dos painéis, cantos e densidade.
+- Planeta "Início" com visão geral dos servidores e do que está acontecendo agora.
+- Perfil no painel com verificação de identidade, volume individual e moderação.
+
+### Segurança
+- A imagem de fundo escolhida pelo usuário é reduzida e guardada cifrada no banco local; os fundos prontos são gerados em CSS (nenhum download).
+- Fontes empacotadas: nada é carregado do Google Fonts ou de outro servidor.
+
 ## [0.3.0] - 2026-10-18
 
 Primeira versão pública. Tudo criptografado e seguro por padrão.

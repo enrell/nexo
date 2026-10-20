@@ -5,10 +5,14 @@ import { Identity, openBackup } from "./identity";
 import { initCertificate, mediaErrorMessage, testOverrideFingerprint } from "./rtc";
 import { Session } from "./session";
 import { decodeInvite, defaultSettings, flushSecureStore, initSecureStore, randomId, storage } from "./storage";
+import { applyTheme } from "./theme";
 import { initVault } from "./vault";
 import type { MsgView, Profile, ServerInfo, Settings, Status } from "./types";
 
 export type View = { type: "chat" } | { type: "live"; origin: string };
+/** O que a coluna da direita (painel contextual) está mostrando. */
+export type CtxView = "home" | "members" | "profile" | "search" | "theme" | "notifications";
+type CtxState = { view: CtxView; arg?: string };
 
 export const COLORS = ["#5865f2", "#eb459e", "#57f287", "#fee75c", "#ed4245", "#f47b67", "#3ba55c", "#9b59b6", "#1abc9c", "#e67e22"];
 export const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)];
@@ -26,7 +30,11 @@ class App {
   activeChannel: Record<string, string> = {};
   view: View = { type: "chat" };
   theater = false;
-  showMembers = true;
+  ctx: CtxState = { view: "home" };
+  private ctxStack: CtxState[] = [];
+  /** texto da busca global (topo à direita) e item selecionado nos resultados */
+  search = "";
+  searchSel = 0;
   unread: Record<string, number> = {};
   mentions: Record<string, number> = {};
   /** última mensagem lida por canal (para o divisor "novas mensagens") */
@@ -59,7 +67,6 @@ class App {
       this.servers = storage.loadServers();
       this.activeChannel = storage.get<Record<string, string>>("activeChannel", {});
       this.lastRead = storage.get<Record<string, number>>("lastRead", {});
-      this.showMembers = storage.get<boolean>("showMembers", true);
       this.audio.loadPrefs();
       this.identity = await Identity.load();
       await initCertificate();
@@ -184,8 +191,7 @@ class App {
 
   applyAppearance() {
     const s = this.settings;
-    document.documentElement.style.setProperty("--font-scale", String(s.fontScale / 100));
-    document.documentElement.classList.toggle("compact", s.compact);
+    applyTheme(s).catch((e) => console.warn("tema", e));
     if (!window.nexo) document.documentElement.style.zoom = String(s.zoom / 100);
   }
 
@@ -348,6 +354,7 @@ class App {
   // ---------------------------------------------------------------- navegação
 
   selectServer(roomId: string) {
+    if (this.activeRoom !== roomId) this.ctxHome(false);
     this.activeRoom = roomId;
     const s = this.session;
     this.view = s?.watching ? { type: "live", origin: s.watching.origin } : { type: "chat" };
@@ -395,10 +402,47 @@ class App {
     this.theater = false;
     this.emit();
   }
-  toggleMembers() {
-    this.showMembers = !this.showMembers;
-    storage.set("showMembers", this.showMembers);
+  /** Planeta "Início": sai dos servidores (amigos e diretas). */
+  goHome() {
+    this.activeRoom = null;
+    this.view = { type: "chat" };
+    this.ctxHome(false);
     this.emit();
+  }
+
+  // ---------------------------------------------------------------- painel contextual (direita)
+
+  openCtx(view: CtxView, arg?: string) {
+    if (this.ctx.view === view && this.ctx.arg === arg) return;
+    if (view === "home") return this.ctxHome();
+    this.ctxStack.push(this.ctx);
+    if (this.ctxStack.length > 20) this.ctxStack.shift();
+    this.ctx = { view, arg };
+    if (this.settings.ctxCollapsed) this.setSettings({ ...this.settings, ctxCollapsed: false });
+    this.emit();
+  }
+  ctxBack() {
+    this.ctx = this.ctxStack.pop() ?? { view: "home" };
+    if (this.ctx.view !== "search") this.search = "";
+    this.emit();
+  }
+  ctxHome(emit = true) {
+    this.ctxStack = [];
+    this.ctx = { view: "home" };
+    this.search = "";
+    if (emit) this.emit();
+  }
+  toggleCtx() {
+    this.setSettings({ ...this.settings, ctxCollapsed: !this.settings.ctxCollapsed });
+  }
+  setSearch(q: string) {
+    this.search = q;
+    if (this.ctx.view !== "search") this.openCtx("search");
+    else this.emit();
+  }
+  toggleMembers() {
+    if (this.ctx.view === "members") this.ctxBack();
+    else this.openCtx("members");
   }
   toggleTheater() {
     this.theater = !this.theater;

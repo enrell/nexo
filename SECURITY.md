@@ -33,7 +33,7 @@ Só a **última versão** recebe correções de segurança. O app se atualiza so
 | Estranho entrando com um convite vazado | **Aprovação de entrada ligada por padrão**: quem entra fica "na porta" sem receber histórico, mídia, digitação nem lista de quem está na voz até um admin aprovar. Admins podem **banir** (todos recusam a conexão do banido) e **renovar o convite** (quem está online migra para uma sala nova). |
 | Ex-admin "voltando no tempo" para forjar moderação com data antiga | Ações de moderação de quem não é admin no momento do recebimento ficam em quarentena e só valem se o autor voltar a ser admin. |
 | Inundação/negação de serviço por um peer | Limite de taxa por peer, tamanho máximo de evento (24 KB) e de mensagem recebida (32 MB), validação estrita de tipos. |
-| Roubo do PC desligado ou cópia da pasta do app | **Tudo no disco é cifrado com AES-256-GCM**: chave de identidade, perfil, convites, configurações, mensagens, membros e anexos. A chave do cofre fica protegida pelo **DPAPI** (Windows): só abre na sua conta de usuário, naquele PC. Cada registro tem um "dado associado" com o seu ID, então registros não podem ser trocados de lugar. |
+| Roubo do PC desligado ou cópia da pasta do app | **Tudo no disco é cifrado com AES-256-GCM**: chave de identidade, perfil, convites, configurações, mensagens, membros, anexos e a imagem de fundo do tema. A chave do cofre fica protegida pelo **DPAPI** (Windows): só abre na sua conta de usuário, naquele PC. Cada registro tem um "dado associado" com o seu ID, então registros não podem ser trocados de lugar. |
 | Perda do PC | Backup da conta **cifrado com senha** (PBKDF2-SHA256, 600 mil iterações + AES-256-GCM). |
 | Página maliciosa ou conteúdo de mensagem executando código | Renderer em **sandbox**, `contextIsolation`, sem Node, **CSP** estrita (`script-src 'self'`), interface servida por protocolo próprio (`nexo-app://`, não `file://`), navegação e novas janelas bloqueadas, sem `webview`, IPC só aceito da nossa página e com argumentos validados. Markdown é renderizado como texto (sem HTML). |
 | Permissões abusivas | Só câmera, microfone, captura de tela, notificações e tela cheia, e só para a página do app. HID/USB/serial negados. |
@@ -47,6 +47,7 @@ Só a **última versão** recebe correções de segurança. O app se atualiza so
 | Configuração | Padrão | Por quê |
 |---|---|---|
 | Prévia de links e imagens externas | **desligada** | Buscar a prévia revela seu IP ao site. |
+| Fontes e fundos do tema | **locais** | Fontes vêm empacotadas e os fundos prontos são gerados em CSS: a interface não acessa nenhum servidor externo. |
 | Texto da mensagem nas notificações | **desligado** | Notificações ficam no histórico do Windows. |
 | Aprovação de novos membros | **ligada** em servidores novos | Convite vazado não basta para entrar. |
 | Esconder IP (só TURN) | desligado | Exige um servidor TURN seu. |

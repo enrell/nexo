@@ -22,5 +22,7 @@ export default defineConfig(() => ({
   },
   build: {
     target: "chrome130",
+    // ícones Phosphor trazem os 6 pesos em cada componente; app desktop carrega do disco
+    chunkSizeWarningLimit: 900,
   },
 }));

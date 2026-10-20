@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nexo · Sala de estar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root {
+    --sand: #f4eee4; --sand-2: #ece3d5; --paper: #fffaf2; --line: #e3d8c7;
+    --ink: #2b2620; --ink-2: #6b6256; --ink-3: #9a8f80;
+    --terra: #c4623d; --terra-2: #a94f2e; --terra-soft: #f3d9cb;
+    --moss: #5f7445; --moss-soft: #dfe6d2; --honey: #d9a95b;
+    --r: 18px;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; }
+  body { background: var(--sand); color: var(--ink); font: 14.5px/1.5 Inter, system-ui, sans-serif; display: flex; flex-direction: column; }
+  h1, h2, h3, .serif { font-family: Fraunces, Georgia, serif; letter-spacing: -.01em; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  i.ph, i.ph-duotone, i.ph-fill { font-size: 19px; }
+
+  /* ---------- topo ---------- */
+  .top { height: 64px; flex: none; display: flex; align-items: center; gap: 18px; padding: 0 20px; }
+  .logo { width: 38px; height: 38px; border-radius: 12px; background: var(--terra); color: #fff; display: grid; place-items: center; font: 700 18px Fraunces; }
+  .servers { display: flex; align-items: center; gap: 8px; padding: 5px; background: var(--sand-2); border-radius: 999px; }
+  .srv { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 12px; color: #fff; position: relative; }
+  .srv.on { box-shadow: 0 0 0 3px var(--sand-2), 0 0 0 5px var(--terra); }
+  .srv .dot { position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%; background: #d64a3a; border: 2px solid var(--sand-2); }
+  .srv.add { background: transparent; color: var(--ink-2); border: 1.5px dashed var(--ink-3); }
+  .title { display: flex; align-items: center; gap: 8px; font: 600 20px Fraunces; }
+  .title i { font-size: 16px; color: var(--ink-3); }
+  .search { margin-left: auto; display: flex; align-items: center; gap: 8px; background: var(--paper); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; width: 300px; color: var(--ink-3); }
+  .search kbd { margin-left: auto; font: 11px Inter; background: var(--sand-2); padding: 2px 6px; border-radius: 6px; color: var(--ink-2); }
+  .ibtn { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); position: relative; }
+  .ibtn:hover { background: var(--sand-2); color: var(--ink); }
+  .ibtn .badge { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--terra); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+  .me { display: flex; align-items: center; gap: 10px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--paper); border: 1px solid var(--line); }
+  .av { border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 700; flex: none; position: relative; }
+  .av .st { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--moss); border: 2px solid var(--paper); }
+
+  /* ---------- corpo ---------- */
+  .wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 236px 1fr 380px; gap: 16px; padding: 0 16px 16px; }
+  .nav { display: flex; flex-direction: column; gap: 4px; padding: 6px 4px; overflow-y: auto; }
+  .nav h4 { margin: 16px 10px 6px; font: 600 11px Inter; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+  .nav a { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 12px; color: var(--ink-2); text-decoration: none; font-weight: 500; }
+  .nav a:hover { background: var(--sand-2); color: var(--ink); }
+  .nav a.on { background: var(--paper); color: var(--ink); box-shadow: 0 1px 0 var(--line); }
+  .nav a .n { margin-left: auto; font-size: 11px; font-weight: 700; color: #fff; background: var(--terra); padding: 1px 7px; border-radius: 999px; }
+  .nav a .ppl { margin-left: auto; display: flex; }
+  .nav a .ppl span { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--sand); margin-left: -6px; }
+  .nav a i.lock { font-size: 13px; margin-left: auto; color: var(--ink-3); }
+  .dock { margin-top: auto; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r); padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .dock .vc { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--moss); font-weight: 600; }
+  .dock .row { display: flex; gap: 6px; }
+  .dock .row button { flex: 1; height: 36px; border-radius: 10px; background: var(--sand); display: grid; place-items: center; color: var(--ink-2); }
+  .dock .row button.red { background: #f6d5cc; color: #b23a22; }
+  .dock .row button:hover { filter: brightness(.96); }
+
+  .home { overflow-y: auto; padding: 4px 4px 80px; display: flex; flex-direction: column; gap: 18px; }
+  .hello h1 { margin: 6px 0 2px; font-size: 34px; font-weight: 600; }
+  .hello p { margin: 0; color: var(--ink-2); }
+  .grid2 { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; }
+  .card { background: var(--paper); border-radius: var(--r); border: 1px solid var(--line); padding: 16px; }
+  .card h3 { margin: 0 0 12px; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card h3 .more { margin-left: auto; font: 500 13px Inter; color: var(--terra); }
+
+  .live { position: relative; border-radius: 14px; overflow: hidden; aspect-ratio: 16/9; background:
+      radial-gradient(120px 80px at 70% 60%, rgba(255,214,140,.9), transparent 70%),
+      linear-gradient(180deg, #2c3b52 0%, #3e5a6e 45%, #b97a52 46%, #7a4a32 100%); }
+  .live .sun { position: absolute; right: 22%; top: 30%; width: 70px; height: 70px; border-radius: 50%; background: #ffd58a; filter: blur(1px); }
+  .live .ridge { position: absolute; left: -10%; right: -10%; bottom: 0; height: 48%; background: #4a2c1f; clip-path: polygon(0 60%, 15% 30%, 30% 55%, 48% 20%, 62% 50%, 80% 25%, 100% 55%, 100% 100%, 0 100%); }
+  .live .hud { position: absolute; left: 12px; top: 12px; display: flex; gap: 6px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .pill.red { background: #d64a3a; color: #fff; }
+  .pill.dark { background: rgba(20,16,12,.55); color: #fff; backdrop-filter: blur(6px); }
+  .live .who { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 10px; color: #fff; }
+  .live .who b { font: 600 16px Fraunces; }
+  .live .who small { opacity: .8; }
+  .live .who button { margin-left: auto; background: #fff; color: var(--ink); padding: 8px 14px; border-radius: 999px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+
+  .stage { display: flex; flex-direction: column; gap: 14px; }
+  .stage .people { display: flex; gap: 14px; flex-wrap: wrap; }
+  .person { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 72px; font-size: 12px; color: var(--ink-2); }
+  .person .av { width: 56px; height: 56px; font-size: 20px; }
+  .person .av.talk { box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--moss); }
+  .person .av .mut { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; color: #b23a22; }
+  .person .av .mut i { font-size: 13px; }
+  .join { align-self: flex-start; background: var(--moss); color: #fff; padding: 10px 16px; border-radius: 12px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+  .join:hover { background: #50633a; }
+
+  .channels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .ch { background: var(--sand); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .ch .h { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  .ch .h .n { margin-left: auto; font-size: 11px; color: #fff; background: var(--terra); padding: 1px 7px; border-radius: 999px; }
+  .ch p { margin: 0; color: var(--ink-2); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ch small { color: var(--ink-3); font-size: 12px; }
+
+  .online { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: flex; align-items: center; gap: 8px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--sand); font-size: 13px; }
+  .chip.off { opacity: .55; }
+  .chip small { color: var(--ink-3); }
+
+  /* ---------- chat ---------- */
+  .chat { background: var(--paper); border: 1px solid var(--line); border-radius: 22px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .chat header { padding: 14px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--line); }
+  .chat header b { font: 600 17px Fraunces; }
+  .chat header small { color: var(--ink-3); }
+  .chat header .ibtn { width: 32px; height: 32px; }
+  .msgs { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .day { align-self: center; font-size: 12px; color: var(--ink-3); background: var(--sand); padding: 3px 10px; border-radius: 999px; }
+  .m { display: flex; gap: 10px; align-items: flex-end; max-width: 88%; }
+  .m .av { width: 30px; height: 30px; font-size: 12px; }
+  .m .b { background: var(--sand); padding: 9px 13px; border-radius: 16px 16px 16px 6px; }
+  .m .b .n { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .m .b .t { font-size: 11px; color: var(--ink-3); margin-left: 6px; font-weight: 400; }
+  .m.mine { align-self: flex-end; flex-direction: row-reverse; }
+  .m.mine .b { background: var(--terra); color: #fff; border-radius: 16px 16px 6px 16px; }
+  .m.mine .b .t { color: rgba(255,255,255,.7); }
+  .reply { font-size: 12px; border-left: 3px solid rgba(255,255,255,.6); padding-left: 8px; margin-bottom: 6px; opacity: .85; }
+  .reacts { display: flex; gap: 4px; margin-top: 6px; }
+  .reacts span { font-size: 12px; background: var(--paper); color: var(--ink); padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); }
+  .reacts span.mine { border-color: var(--terra); background: var(--terra-soft); }
+  .img { width: 220px; height: 130px; border-radius: 12px; margin-top: 6px; background: linear-gradient(135deg, #6d7f4f, #d9a95b); position: relative; overflow: hidden; }
+  .img::after { content: ""; position: absolute; left: 20%; bottom: -20%; width: 90px; height: 90px; border-radius: 50%; background: rgba(255,255,255,.25); }
+  .mention { background: var(--terra-soft); color: var(--terra-2); padding: 0 4px; border-radius: 5px; font-weight: 600; }
+  .typing { font-size: 12px; color: var(--ink-3); padding: 0 16px 6px; display: flex; align-items: center; gap: 6px; }
+  .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); display: inline-block; animation: b 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .2s } .typing i:nth-child(3) { animation-delay: .4s }
+  @keyframes b { 40% { opacity: .2 } }
+  .composer { margin: 0 12px 12px; display: flex; align-items: center; gap: 6px; background: var(--sand); border-radius: 16px; padding: 6px 6px 6px 10px; }
+  .composer input { flex: 1; border: 0; background: none; outline: none; font: inherit; color: var(--ink); padding: 8px 4px; }
+  .composer .send { width: 36px; height: 36px; border-radius: 12px; background: var(--terra); color: #fff; display: grid; place-items: center; }
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="logo">n</div>
+    <div class="servers">
+      <div class="srv on" style="background:#c4623d" title="Os Brabos">OB</div>
+      <div class="srv" style="background:#5f7445" title="Faculdade">FA<span class="dot"></span></div>
+      <div class="srv" style="background:#d9a95b" title="Família">FM</div>
+      <div class="srv add" title="Novo servidor"><i class="ph ph-plus"></i></div>
+    </div>
+    <div class="title">Os Brabos <i class="ph ph-caret-down"></i></div>
+    <div class="search"><i class="ph ph-magnifying-glass"></i> Buscar ou pular para… <kbd>Ctrl K</kbd></div>
+    <button class="ibtn" title="Amigos e conversas"><i class="ph-duotone ph-chats-circle"></i><span class="badge">2</span></button>
+    <button class="ibtn" title="Notificações"><i class="ph-duotone ph-bell"></i></button>
+    <div class="me"><div class="av" style="width:30px;height:30px;background:#5f7445">E<span class="st"></span></div><b style="font-weight:600">enrell</b></div>
+  </div>
+
+  <div class="wrap">
+    <aside class="nav">
+      <a class="on" href="#"><i class="ph-duotone ph-house-line"></i>Início do servidor</a>
+      <a href="#"><i class="ph-duotone ph-users-three"></i>Membros<span class="n" style="background:var(--honey)">1 pedido</span></a>
+      <h4>Conversas</h4>
+      <a href="#"><i class="ph ph-hash"></i>geral</a>
+      <a href="#"><i class="ph ph-hash"></i>clips-e-links<span class="n">4</span></a>
+      <a href="#"><i class="ph ph-hash"></i>memes</a>
+      <a href="#"><i class="ph ph-hash"></i>admins<i class="ph-fill ph-lock-simple lock"></i></a>
+      <h4>Voz</h4>
+      <a href="#"><i class="ph-duotone ph-speaker-high"></i>Sala principal<span class="ppl"><span style="background:#c4623d"></span><span style="background:#5f7445"></span><span style="background:#a88c6a"></span></span></a>
+      <a href="#"><i class="ph-duotone ph-game-controller"></i>Jogando</a>
+      <div class="dock">
+        <div class="vc"><i class="ph-fill ph-cell-signal-full"></i> Na Sala principal · 32 ms</div>
+        <div class="row">
+          <button title="Microfone"><i class="ph-duotone ph-microphone"></i></button>
+          <button title="Áudio"><i class="ph-duotone ph-headphones"></i></button>
+          <button title="Transmitir"><i class="ph-duotone ph-screencast"></i></button>
+          <button class="red" title="Sair da voz"><i class="ph-fill ph-phone-x"></i></button>
+        </div>
+      </div>
+    </aside>
+
+    <section class="home">
+      <div class="hello">
+        <h1>Boa noite, enrell</h1>
+        <p>3 amigos na voz, 1 ao vivo e 4 mensagens novas em #clips-e-links.</p>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <h3><i class="ph-duotone ph-broadcast" style="color:#d64a3a"></i> Ao vivo agora <span class="more">ver todas</span></h3>
+          <div class="live">
+            <div class="sun"></div><div class="ridge"></div>
+            <div class="hud"><span class="pill red"><i class="ph-fill ph-circle" style="font-size:8px"></i>AO VIVO</span><span class="pill dark"><i class="ph ph-eye" style="font-size:14px"></i>3</span><span class="pill dark">1080p · 60</span></div>
+            <div class="who">
+              <div class="av" style="width:34px;height:34px;background:#c4623d">R</div>
+              <div><b>Rafa</b><br /><small>Ranqueada com a galera · há 24 min</small></div>
+              <button><i class="ph-fill ph-play"></i> Assistir</button>
+            </div>
+          </div>
+        </div>
+        <div class="card stage">
+          <h3><i class="ph-duotone ph-speaker-high" style="color:var(--moss)"></i> Sala principal</h3>
+          <div class="people">
+            <div class="person"><div class="av talk" style="background:#c4623d">R</div>Rafa</div>
+            <div class="person"><div class="av" style="background:#5f7445">E</div>você</div>
+            <div class="person"><div class="av" style="background:#a88c6a">M<span class="mut"><i class="ph-fill ph-microphone-slash"></i></span></div>Mari</div>
+          </div>
+          <button class="join"><i class="ph-fill ph-sign-in"></i> Você já está aqui · abrir sala</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><i class="ph-duotone ph-chats-teardrop"></i> Novidades nas conversas</h3>
+        <div class="channels">
+          <div class="ch"><div class="h"><i class="ph ph-hash"></i>clips-e-links<span class="n">4</span></div><p><b>Mari:</b> olha esse clutch que eu fiz ontem 😂 tá no link</p><small>há 5 min</small></div>
+          <div class="ch"><div class="h"><i class="ph ph-hash"></i>geral</div><p><b>Rafa:</b> @enrell abre a sala de voz ae</p><small>há 12 min</small></div>
+          <div class="ch"><div class="h"><i class="ph ph-hash"></i>memes</div><p><b>João:</b> 📎 imagem</p><small>ontem</small></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3><i class="ph-duotone ph-users"></i> Quem está por aqui</h3>
+        <div class="online">
+          <div class="chip"><div class="av" style="width:26px;height:26px;font-size:11px;background:#c4623d">R<span class="st"></span></div>Rafa <small>· ao vivo</small></div>
+          <div class="chip"><div class="av" style="width:26px;height:26px;font-size:11px;background:#a88c6a">M<span class="st"></span></div>Mari <small>· na voz</small></div>
+          <div class="chip"><div class="av" style="width:26px;height:26px;font-size:11px;background:#6a7c9a">L<span class="st" style="background:var(--honey)"></span></div>Lu <small>· ausente</small></div>
+          <div class="chip off"><div class="av" style="width:26px;height:26px;font-size:11px;background:#8a8a8a">J</div>João <small>· visto há 2 h</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="chat">
+      <header><i class="ph ph-hash" style="font-size:20px;color:var(--ink-3)"></i><div><b>geral</b><br /><small>6 pessoas · histórico guardado por todos</small></div><div style="margin-left:auto;display:flex"><button class="ibtn"><i class="ph ph-push-pin"></i></button><button class="ibtn"><i class="ph ph-magnifying-glass"></i></button></div></header>
+      <div class="msgs">
+        <div class="day">Hoje</div>
+        <div class="m"><div class="av" style="background:#c4623d">R</div><div class="b"><div class="n">Rafa<span class="t">21:03</span></div>salve galera, <b>hoje tem live</b> às 21h 🎮</div></div>
+        <div class="m"><div class="av" style="background:#a88c6a">M</div><div class="b"><div class="n">Mari<span class="t">21:04</span></div>olha o print de ontem<div class="img"></div><div class="reacts"><span class="mine">🔥 3</span><span>😂 1</span></div></div></div>
+        <div class="m"><div class="av" style="background:#c4623d">R</div><div class="b"><div class="n">Rafa<span class="t">21:06</span></div><span class="mention">@enrell</span> abre a sala de voz ae</div></div>
+        <div class="m mine"><div class="av" style="background:#5f7445">E</div><div class="b"><div class="reply">Rafa: @enrell abre a sala de voz ae</div>já abri, entra lá<span class="t">21:06</span></div></div>
+      </div>
+      <div class="typing"><i></i><i></i><i></i> Mari está digitando…</div>
+      <div class="composer"><button class="ibtn" style="width:34px;height:34px"><i class="ph ph-plus-circle"></i></button><input placeholder="Conversar em #geral" /><button class="ibtn" style="width:34px;height:34px"><i class="ph ph-smiley"></i></button><button class="send"><i class="ph-fill ph-paper-plane-right"></i></button></div>
+    </section>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nexo · Constelação 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  /*
+   * Constelação 3
+   * - uma grade só: o topo usa as MESMAS colunas do corpo (você | servidores | busca)
+   * - coluna direita = painel contextual (voz/live/membros, personalizar, perfil, busca)
+   * - menus ancorados no botão que os abre
+   * - sem blur: superfícies sólidas com alfa ajustável
+   */
+  :root {
+    --a1: #a78bfa; --a2: #22d3ee; --a3: #f472b6;
+    --grad: linear-gradient(135deg, var(--a1), var(--a2));
+    --panel-alpha: .92;
+    --surface: rgba(17, 18, 34, var(--panel-alpha));
+    --surface-2: rgba(30, 32, 56, var(--panel-alpha));
+    --surface-3: rgba(44, 46, 76, .92);
+    --edge: rgba(255,255,255,.08);
+    --text: #eef0ff; --dim: #a6a9c9; --dimmer: #6f7398;
+    --ok: #34d399; --warn: #fbbf24; --bad: #fb7185;
+    --r: 18px; --r-sm: 12px; --gap: 12px; --pad: 14px;
+    --left: 256px; --right: 320px; --top: 60px;
+    --stars: .5;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { color: var(--text); font: 14.5px/1.5 Inter, system-ui, sans-serif; background: #05060d; transition: background .3s; }
+  .stars { position: fixed; inset: 0; pointer-events: none; opacity: var(--stars);
+    background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(1px 1px at 90% 10%, #fff, transparent), radial-gradient(1.5px 1.5px at 80% 50%, #cfe, transparent), radial-gradient(1px 1px at 20% 90%, #fff, transparent);
+    background-size: 600px 600px; animation: drift 140s linear infinite; }
+  @keyframes drift { to { background-position: 600px 300px; } }
+  h1, h2, h3, .sg { font-family: "Space Grotesk", Inter, sans-serif; }
+  button, input { font: inherit; color: inherit; }
+  button { background: none; border: 0; cursor: pointer; }
+  i.ph, i.ph-duotone, i.ph-fill, i.ph-bold { font-size: 19px; line-height: 1; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 8px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-button { display: none; }
+
+  .panel { background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r); }
+  .ibtn { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; color: var(--dim); position: relative; flex: none; transition: background .12s, color .12s; }
+  .ibtn:hover, .ibtn.on { background: var(--surface-2); color: var(--text); }
+  .ibtn.off { color: var(--bad); }
+  .badge { position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--a3); color: #1a0b14; font-size: 10px; font-weight: 700; display: grid; place-items: center; border: 2px solid #12132a; box-sizing: content-box; }
+  .av { border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #0b0b18; flex: none; position: relative; }
+  .av .st { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #14152b; background: var(--ok); }
+  .av .st.idle { background: var(--warn); } .av .st.off { background: #4b4e6d; }
+  kbd { font: 11px Inter; padding: 1px 6px; border-radius: 6px; background: var(--surface-3); color: var(--dim); }
+
+  /* ---------- grade ---------- */
+  .app { position: relative; height: 100%; display: grid; grid-template-columns: var(--left) 1fr var(--right); grid-template-rows: var(--top) 1fr; gap: var(--gap); padding: var(--gap); }
+
+  /* topo · esquerda: você */
+  .you { display: flex; align-items: center; gap: 4px; padding: 0 8px 0 10px; position: relative; }
+  .you .id { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; padding: 5px 6px; margin-left: -4px; border-radius: 12px; cursor: pointer; }
+  .you .id:hover { background: var(--surface-2); }
+  .you .id b { display: block; font: 600 14px "Space Grotesk"; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .you .id small { display: block; color: var(--dimmer); font-size: 12px; white-space: nowrap; }
+
+  /* topo · centro: servidores */
+  .worlds { display: flex; align-items: center; justify-content: safe center; gap: 10px; padding: 0 12px; overflow-x: auto; scrollbar-width: none; }
+  .worlds::-webkit-scrollbar { display: none; }
+  .planet { width: 38px; height: 38px; border-radius: 50%; position: relative; display: grid; place-items: center; font: 700 12px "Space Grotesk"; cursor: pointer; transition: transform .18s; flex: none; color: #fff; }
+  .planet:hover { transform: translateY(-1px) scale(1.06); }
+  .planet.on::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid transparent; background: var(--grad) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: spin 6s linear infinite; }
+  .planet.on::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--a2); box-shadow: 0 0 8px var(--a2); top: -6px; left: 50%; transform-origin: 0 25px; animation: spin 6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .planet .ping { position: absolute; right: -2px; top: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--a3); border: 2px solid #12132a; }
+  .planet .count { position: absolute; right: -6px; bottom: -4px; }
+  .planet.home { background: var(--surface-2); color: var(--text); }
+  .planet.ghost { background: transparent; color: var(--dim); border: 1.5px dashed rgba(255,255,255,.18); }
+  .planet.ghost:hover { color: var(--text); border-color: var(--a1); }
+  .vsep { width: 1px; height: 26px; background: var(--edge); flex: none; }
+  /* dica flutuante única, posicionada por JS (não é cortada por áreas com rolagem) */
+  #tipEl { position: fixed; z-index: 80; pointer-events: none; background: #0b0c18; border: 1px solid var(--edge); color: var(--text); font: 500 12px Inter; padding: 5px 9px; border-radius: 8px; white-space: nowrap; opacity: 0; transform: translate(-50%, 4px); transition: opacity .1s, transform .1s; }
+  #tipEl.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* topo · direita: busca */
+  .find { display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px; }
+  .search { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 10px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--dimmer); border: 1px solid transparent; transition: border-color .15s; }
+  .search:focus-within { border-color: color-mix(in srgb, var(--a1) 60%, transparent); color: var(--text); }
+  .search input { flex: 1; min-width: 0; background: none; border: 0; outline: none; color: var(--text); }
+  .search input::placeholder { color: var(--dimmer); }
+
+  /* ---------- coluna esquerda ---------- */
+  .side { display: flex; flex-direction: column; min-height: 0; padding: 8px 10px 10px; }
+  .srv { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 8px 10px; border-radius: 14px; cursor: pointer; margin-bottom: 4px; }
+  .srv:hover { background: var(--surface-2); }
+  .srv .emb { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font: 700 12px "Space Grotesk"; color: #fff; background: radial-gradient(circle at 30% 30%, #c4b5fd, #6d28d9); flex: none; }
+  .srv b { display: block; font: 600 16px "Space Grotesk"; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .srv small { color: var(--dimmer); font-size: 12px; display: flex; align-items: center; gap: 4px; }
+  .srv .chev { margin-left: auto; color: var(--dimmer); font-size: 15px; transition: transform .15s; }
+  .srv.open .chev { transform: rotate(180deg); }
+  .scroll { flex: 1; overflow-y: auto; min-height: 0; margin: 0 -4px; padding: 0 4px; }
+  .side h4 { margin: 12px 10px 4px; font: 600 11px Inter; letter-spacing: .1em; text-transform: uppercase; color: var(--dimmer); display: flex; justify-content: space-between; align-items: center; }
+  .side h4 button { color: var(--dimmer); display: grid; }
+  .side h4 button:hover { color: var(--text); }
+  .side h4 i { font-size: 14px; }
+  .side a { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 11px; color: var(--dim); text-decoration: none; position: relative; }
+  .side a:hover { background: var(--surface-2); color: var(--text); }
+  .side a.on { background: color-mix(in srgb, var(--a1) 18%, transparent); color: var(--text); }
+  .side a.on::before { content: ""; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--grad); }
+  .side a.unread { color: var(--text); font-weight: 600; }
+  .side a .n { margin-left: auto; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--a3); color: #1a0b14; }
+  .side a .lk { margin-left: auto; font-size: 13px; color: var(--dimmer); }
+  .side .vroom { padding-left: 34px; display: flex; flex-direction: column; gap: 2px; margin: 2px 0 4px; }
+  .side .vroom div { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--dim); padding: 3px 6px; border-radius: 8px; }
+  .side .vroom div:hover { background: var(--surface-2); color: var(--text); }
+  .side .vroom .av { width: 20px; height: 20px; font-size: 9px; }
+  .side .vroom .av.talk { box-shadow: 0 0 0 2px #14152b, 0 0 0 3.5px var(--ok); }
+  .side .vroom i { margin-left: auto; font-size: 13px; color: var(--bad); }
+  .dock { margin-top: 8px; padding: 10px; border-radius: 14px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
+  .dock .st { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+  .dock .st b { color: var(--ok); font-weight: 600; }
+  .dock .st small { color: var(--dimmer); }
+  .dock .bt { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .dock .bt button { height: 34px; border-radius: 10px; background: var(--surface-3); display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--text); font-size: 12px; }
+  .dock .bt button:hover { filter: brightness(1.15); }
+  .dock .bt button.hang { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
+
+  /* ---------- chat (centro) ---------- */
+  .chat { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .chat header { height: 58px; flex: none; padding: 0 10px 0 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid var(--edge); }
+  .chat header .h { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+  .chat header h3 { margin: 0; font-size: 17px; display: flex; align-items: center; gap: 6px; }
+  .chat header h3 i { color: var(--a1); font-size: 18px; }
+  .chat header small { color: var(--dimmer); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .livecap { margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 4px 4px 4px 12px; border-radius: 999px; background: color-mix(in srgb, var(--a3) 13%, transparent); border: 1px solid color-mix(in srgb, var(--a3) 38%, transparent); font-size: 13px; white-space: nowrap; }
+  .livecap .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a3); animation: pulse 1.4s infinite; }
+  .livecap button { background: var(--a3); color: #1a0b14; padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .msgs { flex: 1; overflow-y: auto; padding: 18px 22px 8px; display: flex; flex-direction: column; gap: 14px; }
+  .sys { align-self: center; font-size: 12px; color: var(--dimmer); display: flex; align-items: center; gap: 8px; }
+  .sys::before, .sys::after { content: ""; width: 60px; height: 1px; background: var(--edge); }
+  .card { display: flex; gap: 12px; max-width: 72%; }
+  .card .av { width: 36px; height: 36px; font-size: 14px; cursor: pointer; }
+  .bubble { background: var(--surface-2); border: 1px solid var(--edge); border-radius: 18px; border-top-left-radius: 6px; padding: 9px 14px 10px; }
+  .bubble .who { display: flex; gap: 8px; align-items: baseline; font-size: 13px; margin-bottom: 2px; }
+  .bubble .who b { font-family: "Space Grotesk"; cursor: pointer; }
+  .bubble .who b:hover { text-decoration: underline; }
+  .bubble .who small { color: var(--dimmer); font-size: 11px; }
+  .bubble .who .role { font-size: 10px; font-weight: 600; padding: 0 6px; border-radius: 6px; background: color-mix(in srgb, var(--a1) 22%, transparent); color: var(--a1); }
+  .card.mine { align-self: flex-end; flex-direction: row-reverse; }
+  .card.mine .bubble { border-radius: 18px; border-top-right-radius: 6px; border: 1px solid transparent; background: linear-gradient(var(--surface-2), var(--surface-2)) padding-box, var(--grad) border-box; }
+  .mention { color: var(--a2); background: color-mix(in srgb, var(--a2) 14%, transparent); padding: 0 4px; border-radius: 5px; }
+  .reacts { display: flex; gap: 6px; margin-top: 8px; }
+  .reacts span { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--edge); cursor: pointer; }
+  .reacts span.mine { border-color: var(--a1); background: color-mix(in srgb, var(--a1) 22%, transparent); }
+  .shot { margin-top: 8px; width: 320px; max-width: 100%; aspect-ratio: 16/9; border-radius: 14px; background: radial-gradient(circle at 30% 40%, var(--a3), transparent 50%), radial-gradient(circle at 70% 70%, var(--a2), transparent 50%), #1b1640; position: relative; overflow: hidden; }
+  .shot::after { content: "clutch.png · 2,1 MB"; position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: #fff; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 6px; }
+  .quote { font-size: 12px; color: var(--dim); border-left: 2px solid var(--a1); padding-left: 8px; margin-bottom: 6px; }
+  .door { align-self: center; display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 12px; border-radius: 14px; background: color-mix(in srgb, var(--warn) 10%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent); font-size: 13px; }
+  .door button { padding: 5px 12px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+  .door .yes { background: var(--warn); color: #241a02; }
+  .door .no { background: var(--surface-3); }
+  .typing { height: 22px; padding: 0 24px; font-size: 12px; color: var(--dimmer); display: flex; align-items: center; gap: 6px; }
+  .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--dimmer); display: inline-block; animation: blink 1.2s infinite; }
+  .typing i:nth-child(2) { animation-delay: .2s; } .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 40% { opacity: .2; } }
+  .composer { margin: 0 14px 14px; display: flex; align-items: center; gap: 4px; padding: 6px 6px 6px 8px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--edge); }
+  .composer:focus-within { border-color: color-mix(in srgb, var(--a1) 45%, transparent); }
+  .composer input { flex: 1; border: 0; outline: none; background: none; color: var(--text); padding: 8px 6px; }
+  .composer input::placeholder { color: var(--dimmer); }
+  .send { width: 38px; height: 38px; border-radius: 12px; background: var(--grad); color: #0b0b18; display: grid; place-items: center; }
+
+  /* ---------- painel contextual (direita) ---------- */
+  .ctx { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .ctx-head { height: 58px; flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px; border-bottom: 1px solid var(--edge); }
+  .ctx-head h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; flex: 1; }
+  .ctx-head h3 i { color: var(--a2); }
+  .ctx-body { flex: 1; overflow-y: auto; padding: var(--pad); display: flex; flex-direction: column; gap: 18px; animation: enter .16s ease-out; }
+  @keyframes enter { from { opacity: 0; transform: translateX(8px); } }
+  .sec h5 { margin: 0 0 8px; font: 600 11px Inter; letter-spacing: .1em; text-transform: uppercase; color: var(--dimmer); display: flex; justify-content: space-between; align-items: center; }
+  .sec h5 a { color: var(--a1); text-transform: none; letter-spacing: 0; font-size: 12px; cursor: pointer; }
+
+  .orbit { position: relative; height: 196px; }
+  .ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px dashed var(--edge); transform: translate(-50%,-50%); }
+  .core { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; transform: translate(-50%,-50%); border-radius: 50%; background: var(--grad); display: grid; place-items: center; color: #0b0b18; }
+  .bub { position: absolute; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); cursor: pointer; }
+  .bub .av { width: 42px; height: 42px; font-size: 15px; }
+  .bub.talk .av { box-shadow: 0 0 0 3px color-mix(in srgb, var(--a1) 50%, transparent), 0 0 0 7px color-mix(in srgb, var(--a1) 15%, transparent); animation: talk 1.1s ease-in-out infinite; }
+  @keyframes talk { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--a1) 50%, transparent), 0 0 0 11px color-mix(in srgb, var(--a1) 4%, transparent); } }
+  .bub .mut { position: absolute; top: 26px; right: -4px; width: 20px; height: 20px; border-radius: 50%; background: #2a1030; display: grid; place-items: center; color: var(--a3); }
+  .bub .mut i { font-size: 12px; }
+  .lthumb { position: relative; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; cursor: pointer; background: linear-gradient(160deg, #1e3a8a 0%, color-mix(in srgb, var(--a1) 80%, #000) 55%, var(--a3) 100%); }
+  .lthumb::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: #0b0b18; clip-path: polygon(0 70%, 20% 30%, 35% 60%, 55% 15%, 75% 55%, 100% 25%, 100% 100%, 0 100%); opacity: .85; }
+  .lthumb .tag { position: absolute; left: 10px; top: 10px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--a3); color: #1a0b14; }
+  .lthumb .v { position: absolute; right: 10px; top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.5); }
+  .lthumb .pl { position: absolute; inset: 0; display: grid; place-items: center; opacity: 0; transition: opacity .15s; }
+  .lthumb:hover .pl { opacity: 1; }
+  .lthumb .pl span { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.92); color: #0b0b18; display: grid; place-items: center; }
+  .lmeta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .lmeta small { color: var(--dimmer); display: block; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 12px; cursor: pointer; }
+  .row:hover { background: var(--surface-2); }
+  .row .nm { min-width: 0; flex: 1; }
+  .row .nm b { font-weight: 500; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row small { color: var(--dimmer); display: block; font-size: 12px; }
+  .row .ic { font-size: 15px; }
+  .row.off { opacity: .45; }
+  .row.wait { background: color-mix(in srgb, var(--warn) 8%, transparent); }
+  .row .acts { display: flex; gap: 4px; }
+  .row .acts button { padding: 4px 10px; border-radius: 9px; font-size: 12px; font-weight: 600; }
+  .row .acts .yes { background: var(--warn); color: #241a02; }
+
+  /* perfil no painel */
+  .prof { margin: calc(-1 * var(--pad)); margin-bottom: 0; }
+  .prof .banner { height: 96px; background: var(--grad); }
+  .prof .top { padding: 0 var(--pad); margin-top: -34px; display: flex; align-items: flex-end; gap: 10px; }
+  .prof .top .av { width: 72px; height: 72px; font-size: 26px; border: 5px solid #121327; box-sizing: content-box; }
+  .prof .top .av .st { width: 14px; height: 14px; right: 2px; bottom: 2px; }
+  .prof h2 { margin: 10px var(--pad) 0; font-size: 21px; }
+  .prof .sub { margin: 0 var(--pad); color: var(--dimmer); font-size: 13px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--surface-2); }
+  .chips span i { font-size: 13px; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; height: 38px; border-radius: 12px; background: var(--surface-2); font-weight: 600; font-size: 13px; }
+  .btn:hover { filter: brightness(1.15); }
+  .btn.pri { background: var(--grad); color: #0b0b18; }
+  .keybox { font: 12px ui-monospace, "Cascadia Code", Consolas, monospace; color: var(--dim); background: var(--surface-2); border-radius: 10px; padding: 8px 10px; word-break: break-all; }
+  input[type=range] { width: 100%; accent-color: var(--a1); }
+
+  /* resultados de busca */
+  .res { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 10px; cursor: pointer; }
+  .res:hover, .res.sel { background: var(--surface-2); }
+  .res i { color: var(--dim); }
+  .res small { color: var(--dimmer); margin-left: auto; font-size: 12px; }
+  .res .ex { color: var(--dim); font-size: 13px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 210px; }
+  .empty { color: var(--dimmer); font-size: 13px; text-align: center; padding: 20px 0; }
+
+  /* personalizar */
+  .sw { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sw button { width: 38px; height: 38px; border-radius: 12px; border: 2px solid transparent; }
+  .sw button.on { border-color: #fff; }
+  .bgs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .bgs button { height: 46px; border-radius: 10px; border: 2px solid transparent; font-size: 10px; color: #fff; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; text-shadow: 0 1px 2px #000; background-size: cover !important; background-position: center !important; }
+  .bgs button.on { border-color: #fff; }
+  .seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+  .seg button { flex: 1; padding: 6px 4px; border-radius: 8px; font-size: 12px; color: var(--dim); }
+  .seg button.on { background: var(--surface-3); color: var(--text); }
+
+  /* ---------- menus ancorados ---------- */
+  .menu { position: absolute; z-index: 60; min-width: 230px; padding: 6px; background: #0e0f1f; border: 1px solid var(--edge); border-radius: 14px; box-shadow: 0 18px 40px rgba(0,0,0,.5); display: none; }
+  .menu.open { display: block; animation: drop .12s ease-out; }
+  @keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
+  .menu button { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 9px; color: var(--dim); text-align: left; font-size: 13.5px; }
+  .menu button:hover { background: var(--surface-2); color: var(--text); }
+  .menu button i { font-size: 17px; }
+  .menu button .k { margin-left: auto; font-size: 11px; color: var(--dimmer); }
+  .menu .sepm { height: 1px; background: var(--edge); margin: 5px 4px; }
+  .menu .acc { color: var(--a1); }
+  .menu .dan { color: var(--bad); }
+  .menu .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; margin: 0 3px; }
+  .menu .chk { margin-left: auto; color: var(--a2); }
+  #youMenu { top: calc(100% + 8px); right: 8px; }
+  #srvMenu { top: calc(100% + 4px); left: 0; right: 0; }
+
+  @media (max-width: 1280px) { :root { --left: 236px; --right: 290px; } .card { max-width: 82%; } }
+</style>
+</head>
+<body>
+  <div class="stars"></div>
+  <div class="app">
+    <!-- topo · esquerda: você -->
+    <div class="you panel">
+      <div class="id" id="youId" title="Seu perfil">
+        <div class="av" style="width:36px;height:36px;font-size:14px;background:var(--a2)">E<span class="st" id="youSt"></span></div>
+        <div style="min-width:0"><b>enrell</b><small id="youStTxt">Online</small></div>
+      </div>
+      <button class="ibtn tip" id="micBtn" data-tip="Microfone (Ctrl+Shift+M)"><i class="ph-duotone ph-microphone"></i></button>
+      <button class="ibtn tip" id="fonBtn" data-tip="Áudio (Ctrl+Shift+D)"><i class="ph-duotone ph-headphones"></i></button>
+      <button class="ibtn tip" id="youBtn" data-tip="Menu"><i class="ph-bold ph-dots-three"></i></button>
+      <div class="menu" id="youMenu">
+        <button data-status="online"><span class="dot" style="background:var(--ok)"></span>Online<i class="ph-bold ph-check chk"></i></button>
+        <button data-status="idle"><span class="dot" style="background:var(--warn)"></span>Ausente</button>
+        <button data-status="dnd"><span class="dot" style="background:var(--bad)"></span>Não perturbe</button>
+        <div class="sepm"></div>
+        <button data-view="theme"><i class="ph-duotone ph-palette"></i>Personalizar aparência</button>
+        <button data-view="me"><i class="ph-duotone ph-user-circle"></i>Meu perfil</button>
+        <button><i class="ph-duotone ph-gear-six"></i>Configurações<span class="k">Ctrl ,</span></button>
+        <div class="sepm"></div>
+        <button><i class="ph-duotone ph-copy"></i>Copiar meu ID</button>
+      </div>
+    </div>
+
+    <!-- topo · centro: mundos (servidores) -->
+    <nav class="worlds panel">
+      <div class="planet home tip" data-tip="Início · amigos e diretas"><i class="ph-duotone ph-chats-teardrop"></i><span class="badge count">2</span></div>
+      <div class="vsep"></div>
+      <div class="planet on tip" data-tip="Os Brabos" style="background:radial-gradient(circle at 30% 30%, #c4b5fd, #6d28d9)">OB</div>
+      <div class="planet tip" data-tip="Faculdade" style="background:radial-gradient(circle at 30% 30%, #67e8f9, #0e7490)">FA<span class="ping"></span></div>
+      <div class="planet tip" data-tip="Família" style="background:radial-gradient(circle at 30% 30%, #f9a8d4, #be185d)">FM</div>
+      <div class="planet tip" data-tip="Clã do RPG" style="background:radial-gradient(circle at 30% 30%, #fde68a, #b45309)">CR</div>
+      <div class="planet ghost tip" data-tip="Criar ou entrar com convite"><i class="ph ph-plus"></i></div>
+    </nav>
+
+    <!-- topo · direita: busca -->
+    <div class="find panel">
+      <label class="search"><i class="ph ph-magnifying-glass"></i><input id="q" placeholder="Buscar ou pular para…" autocomplete="off" /><kbd>Ctrl K</kbd></label>
+      <button class="ibtn tip" data-tip="Notificações"><i class="ph-duotone ph-bell"></i><span class="badge">3</span></button>
+    </div>
+
+    <!-- esquerda: servidor e canais -->
+    <aside class="side panel">
+      <div class="srv" id="srvBtn">
+        <div class="emb">OB</div>
+        <div style="min-width:0"><b>Os Brabos</b><small><i class="ph-fill ph-lock-simple" style="font-size:11px"></i>6 online · cifrado</small></div>
+        <i class="ph-bold ph-caret-down chev"></i>
+        <div class="menu" id="srvMenu">
+          <button class="acc"><i class="ph-duotone ph-user-plus"></i>Convidar amigos</button>
+          <button><i class="ph-duotone ph-sliders-horizontal"></i>Configurações do servidor</button>
+          <button><i class="ph-duotone ph-plus-circle"></i>Criar canal</button>
+          <button><i class="ph-duotone ph-bell-slash"></i>Silenciar servidor</button>
+          <div class="sepm"></div>
+          <button class="dan"><i class="ph-duotone ph-sign-out"></i>Sair do servidor</button>
+        </div>
+      </div>
+      <div class="scroll">
+        <h4>Canais <button title="Criar canal"><i class="ph-bold ph-plus"></i></button></h4>
+        <a class="on" href="#"><i class="ph ph-hash"></i>geral</a>
+        <a class="unread" href="#"><i class="ph ph-hash"></i>clips-e-links<span class="n">4</span></a>
+        <a href="#"><i class="ph ph-hash"></i>memes</a>
+        <a href="#"><i class="ph ph-hash"></i>admins<i class="ph-fill ph-lock-simple lk"></i></a>
+        <h4>Voz</h4>
+        <a href="#"><i class="ph-duotone ph-planet"></i>Sala principal</a>
+        <div class="vroom">
+          <div><span class="av talk" style="background:var(--a1)">R</span>Rafa</div>
+          <div><span class="av" style="background:var(--a2)">E</span>você</div>
+          <div><span class="av" style="background:var(--a3)">M</span>Mari<i class="ph-fill ph-microphone-slash"></i></div>
+        </div>
+        <a href="#"><i class="ph-duotone ph-game-controller"></i>Jogando</a>
+      </div>
+      <div class="dock">
+        <div class="st"><i class="ph-fill ph-cell-signal-full" style="color:var(--ok)"></i><b>Sala principal</b><small>· 32 ms</small></div>
+        <div class="bt">
+          <button title="Transmitir"><i class="ph-duotone ph-screencast"></i></button>
+          <button title="Câmera"><i class="ph-duotone ph-video-camera"></i></button>
+          <button class="hang" title="Sair da voz"><i class="ph-fill ph-phone-x"></i></button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- centro: chat -->
+    <main class="chat panel">
+      <header>
+        <div class="h"><h3><i class="ph-bold ph-hash"></i>geral</h3><small>conversa principal da galera</small></div>
+        <div class="livecap"><span class="dot"></span>Rafa está ao vivo<button>Assistir</button></div>
+        <button class="ibtn tip" data-tip="Fixadas"><i class="ph-duotone ph-push-pin"></i></button>
+        <button class="ibtn tip" data-tip="Membros" data-view="members"><i class="ph-duotone ph-users-three"></i></button>
+      </header>
+      <div class="msgs">
+        <div class="sys">hoje</div>
+        <div class="card"><div class="av" data-user="Rafa" style="background:var(--a1)">R</div><div class="bubble"><div class="who"><b data-user="Rafa">Rafa</b><span class="role">admin</span><small>21:03</small></div>salve galera, <b>hoje tem live</b> às 21h 🎮</div></div>
+        <div class="card"><div class="av" data-user="Mari" style="background:var(--a3)">M</div><div class="bubble"><div class="who"><b data-user="Mari">Mari</b><small>21:04</small></div>olha esse clutch de ontem<div class="shot"></div><div class="reacts"><span class="mine">🔥 3</span><span>😂 1</span></div></div></div>
+        <div class="card"><div class="av" data-user="Rafa" style="background:var(--a1)">R</div><div class="bubble"><div class="who"><b data-user="Rafa">Rafa</b><span class="role">admin</span><small>21:06</small></div><span class="mention">@enrell</span> abre a sala de voz ae</div></div>
+        <div class="card mine"><div class="av" style="background:var(--a2)">E</div><div class="bubble"><div class="quote">Rafa: @enrell abre a sala de voz ae</div>já abri, entra lá ✨<div class="who" style="justify-content:flex-end;margin:4px 0 0"><small>21:06 · entregue</small></div></div></div>
+        <div class="door"><i class="ph-duotone ph-door-open" style="color:var(--warn)"></i><span><b>Lu</b> pediu para entrar</span><button class="no" data-user="Lu">Ver perfil</button><button class="yes">Aprovar</button></div>
+      </div>
+      <div class="typing"><i></i><i></i><i></i> Mari está digitando…</div>
+      <div class="composer"><button class="ibtn tip" data-tip="Anexar"><i class="ph ph-plus-circle"></i></button><input placeholder="Mensagem para #geral" /><button class="ibtn tip" data-tip="Emoji"><i class="ph ph-smiley"></i></button><button class="send" title="Enviar"><i class="ph-fill ph-paper-plane-tilt"></i></button></div>
+    </main>
+
+    <!-- direita: painel contextual -->
+    <aside class="ctx panel" id="ctx"></aside>
+  </div>
+
+  <div id="tipEl"></div>
+  <script>
+    // ---------- dicas ----------
+    const tipEl = document.getElementById("tipEl");
+    document.addEventListener("mouseover", (e) => {
+      const t = e.target.closest("[data-tip]");
+      if (!t) return tipEl.classList.remove("show");
+      const r = t.getBoundingClientRect();
+      tipEl.textContent = t.dataset.tip;
+      const below = r.top < 120;
+      tipEl.style.left = Math.min(innerWidth - 80, Math.max(80, r.left + r.width / 2)) + "px";
+      tipEl.style.top = (below ? r.bottom + 8 : r.top - 34) + "px";
+      tipEl.classList.add("show");
+    });
+    document.addEventListener("mousedown", () => tipEl.classList.remove("show"));
+
+    // ---------- dados de exemplo ----------
+    const PEOPLE = {
+      enrell: { c: "var(--a2)", role: "Dono", st: "", act: "na voz", key: "kQ7m-3Fv9-Xp2a-Lr8T-c4Wn-Hz6E" },
+      Rafa: { c: "var(--a1)", role: "Admin", st: "", act: "transmitindo · Ranqueada", key: "R4fa-9Kd2-Mm7P-qX1z-Tt5B-uV3s", bio: "main jungle, odeio perder" },
+      Mari: { c: "var(--a3)", role: "Membro", st: "", act: "na voz · mudo", key: "M4ri-2Lp8-Qw6E-zN9c-Ry3F-hJ7k", bio: "clipes toda semana 🎬" },
+      Lu: { c: "#fbbf24", role: "Aguardando aprovação", st: "idle", act: "pediu para entrar", key: "kP3x-7Hq2-Bn5D-wY8m-Ls1V-9qQe" },
+      João: { c: "#94a3b8", role: "Membro", st: "off", act: "visto há 2 h", key: "J0ao-4Vb9-Kc2R-pM6x-Zt8N-wQ1d" },
+    };
+
+    // ---------- painel contextual ----------
+    const ctx = document.getElementById("ctx");
+    const stack = [];
+    function head(title, icon, back) {
+      return `<div class="ctx-head">${back ? `<button class="ibtn" data-back title="Voltar (Esc)"><i class="ph-bold ph-arrow-left"></i></button>` : ""}<h3><i class="${icon}"></i>${title}</h3>${back ? `<button class="ibtn" data-home title="Fechar"><i class="ph-bold ph-x"></i></button>` : `<button class="ibtn" title="Recolher"><i class="ph-bold ph-sidebar-simple"></i></button>`}</div>`;
+    }
+    const av = (n, size = 32) => { const p = PEOPLE[n]; return `<div class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size * .38)}px;background:${p.c}">${n[0].toUpperCase()}<span class="st ${p.st}"></span></div>`; };
+    const VIEWS = {
+      home: () => head("Agora", "ph-duotone ph-planet") + `<div class="ctx-body">
+        <div class="sec"><h5>Sala principal <a>abrir</a></h5>
+          <div class="orbit">
+            <div class="ring" style="width:186px;height:186px"></div><div class="ring" style="width:118px;height:118px"></div>
+            <div class="core"><i class="ph-fill ph-waveform" style="font-size:22px"></i></div>
+            <div class="bub talk" data-user="Rafa" style="left:50%;top:10%"><div class="av" style="background:var(--a1)">R</div>Rafa</div>
+            <div class="bub" data-user="enrell" style="left:18%;top:78%"><div class="av" style="background:var(--a2)">E</div>você</div>
+            <div class="bub" data-user="Mari" style="left:82%;top:78%"><div class="av" style="background:var(--a3)">M</div><span class="mut"><i class="ph-fill ph-microphone-slash"></i></span>Mari</div>
+          </div></div>
+        <div class="sec"><h5>Ao vivo <a>ver todas</a></h5>
+          <div class="lthumb"><span class="tag">AO VIVO</span><span class="v">3 · 1080p60</span><div class="pl"><span><i class="ph-fill ph-play"></i></span></div></div>
+          <div class="lmeta">${av("Rafa", 30)}<div><b class="sg">Rafa</b><small>Ranqueada · há 24 min</small></div></div></div>
+        <div class="sec"><h5>Tripulação <a data-view="members">todos (6)</a></h5>
+          ${["enrell", "Rafa", "Mari"].map((n) => `<div class="row" data-user="${n}">${av(n)}<div class="nm"><b>${n === "enrell" ? "enrell (você)" : n}</b><small>${PEOPLE[n].act}</small></div>${n === "enrell" ? '<i class="ph-fill ph-crown ic" style="color:#fbbf24"></i>' : n === "Rafa" ? '<i class="ph-fill ph-shield-star ic" style="color:var(--a1)"></i>' : ""}</div>`).join("")}
+          <div class="row wait" data-user="Lu">${av("Lu")}<div class="nm"><b>Lu</b><small>pediu para entrar</small></div><div class="acts"><button class="yes">Aprovar</button></div></div>
+        </div></div>`,
+      members: () => head("Membros", "ph-duotone ph-users-three", true) + `<div class="ctx-body">
+        <div class="sec"><h5>Na porta · 1</h5><div class="row wait" data-user="Lu">${av("Lu")}<div class="nm"><b>Lu</b><small>pediu para entrar</small></div><div class="acts"><button class="yes">Aprovar</button></div></div></div>
+        <div class="sec"><h5>Administração · 2</h5>${["enrell", "Rafa"].map((n) => `<div class="row" data-user="${n}">${av(n)}<div class="nm"><b>${n}</b><small>${PEOPLE[n].role}</small></div></div>`).join("")}</div>
+        <div class="sec"><h5>Online · 1</h5><div class="row" data-user="Mari">${av("Mari")}<div class="nm"><b>Mari</b><small>${PEOPLE.Mari.act}</small></div></div></div>
+        <div class="sec"><h5>Offline · 1</h5><div class="row off" data-user="João">${av("João")}<div class="nm"><b>João</b><small>${PEOPLE["João"].act}</small></div></div></div>
+      </div>`,
+      profile: (n) => { const p = PEOPLE[n]; const me = n === "enrell"; return head(me ? "Meu perfil" : "Perfil", "ph-duotone ph-user-circle", true) + `<div class="ctx-body">
+        <div class="prof"><div class="banner" style="${n === "Mari" ? "background:linear-gradient(135deg,var(--a3),var(--a1))" : n === "Lu" ? "background:linear-gradient(135deg,#fbbf24,#fb7185)" : ""}"></div>
+          <div class="top">${av(n, 72)}</div><h2>${n}</h2><p class="sub">${p.act}</p></div>
+        ${p.bio ? `<div class="sec"><h5>Sobre</h5><div style="color:var(--dim)">${p.bio}</div></div>` : ""}
+        <div class="sec"><h5>Cargos</h5><div class="chips"><span><i class="${p.role === "Dono" ? "ph-fill ph-crown" : p.role === "Admin" ? "ph-fill ph-shield-star" : "ph-duotone ph-user"}"></i>${p.role}</span></div></div>
+        ${me ? "" : `<div class="btns"><button class="btn pri"><i class="ph-fill ph-chat-circle-dots"></i>Mensagem</button><button class="btn"><i class="ph-duotone ph-user-plus"></i>Adicionar</button></div>`}
+        ${n === "Lu" ? `<div class="btns"><button class="btn" style="background:var(--warn);color:#241a02"><i class="ph-bold ph-check"></i>Aprovar</button><button class="btn"><i class="ph-bold ph-x"></i>Recusar</button></div>` : ""}
+        ${!me && n !== "Lu" ? `<div class="sec"><h5>Volume para você · 100%</h5><input type="range" min="0" max="200" value="100" /></div>` : ""}
+        <div class="sec"><h5>${me ? "Sua chave pública" : "Identidade"}</h5><div class="keybox">${p.key}</div>${me ? "" : `<button class="btn" style="width:100%;margin-top:8px"><i class="ph-duotone ph-shield-check"></i>Verificar identidade</button>`}</div>
+      </div>`; },
+      search: () => head("Pular para", "ph ph-magnifying-glass", true) + `<div class="ctx-body" id="results"></div>`,
+      theme: () => head("Personalizar", "ph-duotone ph-palette", true) + `<div class="ctx-body">
+        <div style="color:var(--dimmer);font-size:12.5px;margin-top:-4px">Cores sólidas com transparência, sem blur: qualquer fundo combina. As mudanças aparecem na hora.</div>
+        <div class="sec"><h5>Cores de destaque</h5><div class="sw" id="accents"></div></div>
+        <div class="sec"><h5>Fundo</h5><div class="bgs" id="bgs"></div></div>
+        <div class="sec"><h5>Opacidade dos painéis · <span id="opv"></span></h5><input type="range" id="op" min="55" max="100" /></div>
+        <div class="sec"><h5>Cantos</h5><div class="seg" id="radius"><button data-v="8">retos</button><button data-v="18">redondos</button><button data-v="26">bem redondos</button></div></div>
+        <div class="sec"><h5>Densidade</h5><div class="seg" id="density"><button data-v="compact">compacta</button><button data-v="normal">normal</button><button data-v="airy">arejada</button></div></div>
+        <button class="btn" id="reset"><i class="ph ph-arrow-counter-clockwise"></i>Voltar ao padrão</button>
+      </div>`,
+    };
+    let current = ["home"];
+    function show(view, arg, push = true) {
+      if (push && current[0] !== view) stack.push(current);
+      if (view === "home") stack.length = 0;
+      current = [view, arg];
+      ctx.innerHTML = view === "profile" ? VIEWS.profile(arg) : VIEWS[view]();
+      if (view === "theme") bindTheme();
+      if (view === "search") renderResults(document.getElementById("q").value);
+    }
+    function back() { const prev = stack.pop(); if (prev) show(prev[0], prev[1], false); else show("home", null, false); }
+
+    // ---------- busca ----------
+    const TARGETS = [
+      { t: "#geral", k: "canal", i: "ph ph-hash" }, { t: "#clips-e-links", k: "canal · 4 novas", i: "ph ph-hash" }, { t: "#memes", k: "canal", i: "ph ph-hash" }, { t: "#admins", k: "canal privado", i: "ph-fill ph-lock-simple" },
+      { t: "Sala principal", k: "voz · 3 pessoas", i: "ph-duotone ph-planet" }, { t: "Rafa · Ranqueada", k: "ao vivo", i: "ph-fill ph-broadcast" },
+      { t: "Rafa", k: "pessoa", i: "ph-duotone ph-user", u: "Rafa" }, { t: "Mari", k: "pessoa", i: "ph-duotone ph-user", u: "Mari" }, { t: "João", k: "pessoa", i: "ph-duotone ph-user", u: "João" },
+      { t: "Faculdade", k: "servidor", i: "ph-duotone ph-planet" }, { t: "Família", k: "servidor", i: "ph-duotone ph-planet" },
+    ];
+    const MSGS = [{ a: "Rafa", x: "salve galera, hoje tem live às 21h" }, { a: "Mari", x: "olha esse clutch de ontem" }, { a: "Rafa", x: "@enrell abre a sala de voz ae" }];
+    let sel = 0;
+    function renderResults(q) {
+      const box = document.getElementById("results"); if (!box) return;
+      const s = q.trim().toLowerCase();
+      const hits = TARGETS.filter((t) => !s || t.t.toLowerCase().includes(s) || t.k.includes(s));
+      const msgs = s ? MSGS.filter((m) => m.x.toLowerCase().includes(s) || m.a.toLowerCase().includes(s)) : [];
+      sel = Math.min(sel, Math.max(0, hits.length - 1));
+      box.innerHTML = (hits.length ? `<div class="sec"><h5>${s ? "Lugares e pessoas" : "Recentes"}</h5>${hits.slice(0, 8).map((t, i) => `<div class="res ${i === sel ? "sel" : ""}" ${t.u ? `data-user="${t.u}"` : ""}><i class="${t.i}"></i><span>${t.t}</span><small>${t.k}</small></div>`).join("")}</div>` : "")
+        + (msgs.length ? `<div class="sec"><h5>Mensagens</h5>${msgs.map((m) => `<div class="res"><i class="ph-duotone ph-chat-text"></i><div><b style="font-weight:600">${m.a}</b><span class="ex">${m.x}</span></div><small>#geral</small></div>`).join("")}</div>` : "")
+        + (!hits.length && !msgs.length ? `<div class="empty">Nada encontrado para “${q}”</div>` : "")
+        + `<div style="color:var(--dimmer);font-size:12px;display:flex;gap:10px"><span><kbd>↑</kbd> <kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Esc</kbd> fechar</span></div>`;
+    }
+    const q = document.getElementById("q");
+    q.addEventListener("focus", () => { if (current[0] !== "search") show("search"); });
+    q.addEventListener("input", () => { sel = 0; if (current[0] !== "search") show("search"); renderResults(q.value); });
+    q.addEventListener("keydown", (e) => {
+      const n = document.querySelectorAll("#results .sec:first-child .res").length;
+      if (e.key === "ArrowDown") { e.preventDefault(); sel = (sel + 1) % Math.max(n, 1); renderResults(q.value); }
+      if (e.key === "ArrowUp") { e.preventDefault(); sel = (sel - 1 + n) % Math.max(n, 1); renderResults(q.value); }
+      if (e.key === "Enter") { const el = document.querySelector("#results .res.sel"); if (el?.dataset.user) { q.blur(); show("profile", el.dataset.user); } }
+      if (e.key === "Escape") { q.value = ""; q.blur(); show("home"); e.stopPropagation(); }
+    });
+
+    // ---------- menus ancorados ----------
+    function toggleMenu(id, anchor) {
+      const m = document.getElementById(id);
+      const open = !m.classList.contains("open");
+      document.querySelectorAll(".menu.open").forEach((x) => x.classList.remove("open"));
+      document.querySelectorAll(".srv.open, .ibtn.on").forEach((x) => x.classList.remove("open", "on"));
+      if (open) { m.classList.add("open"); anchor.classList.add(anchor.classList.contains("srv") ? "open" : "on"); }
+    }
+    document.getElementById("youBtn").addEventListener("click", (e) => { e.stopPropagation(); toggleMenu("youMenu", e.currentTarget); });
+    document.getElementById("srvBtn").addEventListener("click", (e) => { if (e.target.closest(".menu")) return; e.stopPropagation(); toggleMenu("srvMenu", e.currentTarget); });
+    const STATUS = { online: ["", "Online"], idle: ["idle", "Ausente"], dnd: ["", "Não perturbe"] };
+    document.querySelectorAll("#youMenu [data-status]").forEach((b) => b.addEventListener("click", () => {
+      const s = b.dataset.status;
+      const st = document.getElementById("youSt");
+      st.className = "st " + STATUS[s][0]; st.style.background = s === "dnd" ? "var(--bad)" : "";
+      document.getElementById("youStTxt").textContent = STATUS[s][1];
+      document.querySelectorAll("#youMenu .chk").forEach((c) => c.remove());
+      b.insertAdjacentHTML("beforeend", '<i class="ph-bold ph-check chk"></i>');
+    }));
+    document.getElementById("youId").addEventListener("click", () => show("profile", "enrell"));
+    let mic = true, fon = true;
+    document.getElementById("micBtn").addEventListener("click", (e) => { mic = !mic; e.currentTarget.classList.toggle("off", !mic); e.currentTarget.innerHTML = `<i class="ph-duotone ph-microphone${mic ? "" : "-slash"}"></i>`; });
+    document.getElementById("fonBtn").addEventListener("click", (e) => { fon = !fon; e.currentTarget.classList.toggle("off", !fon); e.currentTarget.innerHTML = `<i class="ph-duotone ph-headphones"></i>`; if (!fon) e.currentTarget.innerHTML = `<i class="ph-duotone ph-speaker-slash"></i>`; });
+
+    // cliques globais: abrir perfis, trocar de visão, fechar menus
+    document.addEventListener("click", (e) => {
+      const user = e.target.closest("[data-user]");
+      const view = e.target.closest("[data-view]");
+      if (e.target.closest("[data-back]")) back();
+      else if (e.target.closest("[data-home]")) show("home");
+      else if (view) show(view.dataset.view === "me" ? "profile" : view.dataset.view, view.dataset.view === "me" ? "enrell" : undefined);
+      else if (user && !e.target.closest(".yes")) show("profile", user.dataset.user);
+      if (!e.target.closest(".menu") || e.target.closest(".menu button")) {
+        document.querySelectorAll(".menu.open").forEach((x) => x.classList.remove("open"));
+        document.querySelectorAll(".srv.open").forEach((x) => x.classList.remove("open"));
+        document.querySelectorAll("#youBtn.on").forEach((x) => x.classList.remove("on"));
+      }
+    });
+    addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); q.focus(); q.select(); }
+      if (e.key === "Escape" && document.activeElement !== q) {
+        if (document.querySelector(".menu.open")) { document.querySelectorAll(".menu.open").forEach((x) => x.classList.remove("open")); e.stopImmediatePropagation(); }
+        else if (current[0] !== "home") { back(); e.stopImmediatePropagation(); }
+      }
+    }, true);
+
+    // ---------- personalização ----------
+    const ACCENTS = [
+      { a1: "#a78bfa", a2: "#22d3ee", a3: "#f472b6", n: "Constelação" }, { a1: "#fb7185", a2: "#fbbf24", a3: "#f472b6", n: "Pôr do sol" },
+      { a1: "#34d399", a2: "#22d3ee", a3: "#a3e635", n: "Aurora" }, { a1: "#60a5fa", a2: "#818cf8", a3: "#38bdf8", n: "Oceano" }, { a1: "#e5e7eb", a2: "#9ca3af", a3: "#f87171", n: "Grafite" },
+    ];
+    const BGS = {
+      nebula: { n: "Nebulosa", css: "radial-gradient(900px 600px at 15% 10%, rgba(124,58,237,.35), transparent 60%), radial-gradient(800px 600px at 90% 90%, rgba(8,145,178,.30), transparent 60%), radial-gradient(600px 400px at 60% 40%, rgba(244,114,182,.10), transparent 70%), #05060d", stars: .5 },
+      aurora: { n: "Aurora", css: "radial-gradient(1000px 500px at 50% -10%, rgba(52,211,153,.35), transparent 60%), radial-gradient(800px 500px at 100% 100%, rgba(34,211,238,.22), transparent 60%), #040a0c", stars: .35 },
+      solid: { n: "Sólido", css: "#0b0c18", stars: 0 },
+      dusk: { n: "Crepúsculo", css: "linear-gradient(160deg, #1a1033 0%, #3b1438 50%, #0d0b18 100%)", stars: .25 },
+      img1: { n: "Montanhas", css: "linear-gradient(rgba(5,6,13,.25), rgba(5,6,13,.55)), url('https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1920&q=70') center/cover", stars: 0 },
+      img2: { n: "Cidade", css: "linear-gradient(rgba(5,6,13,.3), rgba(5,6,13,.6)), url('https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1920&q=70') center/cover", stars: 0 },
+      img3: { n: "Floresta", css: "linear-gradient(rgba(5,6,13,.3), rgba(5,6,13,.6)), url('https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=70') center/cover", stars: 0 },
+      upload: { n: "Sua imagem", css: null, stars: 0 },
+    };
+    const DENS = { compact: ["8px", "10px"], normal: ["12px", "14px"], airy: ["18px", "20px"] };
+    const DEFAULT = { accent: 0, bg: "nebula", op: 92, r: 18, d: "normal", custom: null };
+    let st = Object.assign({}, DEFAULT, JSON.parse(localStorage.getItem("nexo-theme-preview") || "{}"));
+    const root = document.documentElement.style;
+    function apply() {
+      const a = ACCENTS[st.accent] ?? ACCENTS[0];
+      root.setProperty("--a1", a.a1); root.setProperty("--a2", a.a2); root.setProperty("--a3", a.a3);
+      const bg = BGS[st.bg] ?? BGS.nebula;
+      document.body.style.background = st.bg === "upload" && st.custom ? `linear-gradient(rgba(5,6,13,.3), rgba(5,6,13,.55)), url('${st.custom}') center/cover` : bg.css || BGS.nebula.css;
+      root.setProperty("--stars", bg.stars);
+      root.setProperty("--panel-alpha", st.op / 100);
+      root.setProperty("--r", st.r + "px");
+      root.setProperty("--gap", DENS[st.d][0]); root.setProperty("--pad", DENS[st.d][1]);
+      const save = Object.assign({}, st); if (save.custom && save.custom.startsWith("blob:")) save.custom = null;
+      localStorage.setItem("nexo-theme-preview", JSON.stringify(save));
+      syncThemeUI();
+    }
+    function syncThemeUI() {
+      const opv = document.getElementById("opv"); if (!opv) return;
+      opv.textContent = st.op + "%"; document.getElementById("op").value = st.op;
+      document.querySelectorAll("#accents button").forEach((b, i) => b.classList.toggle("on", i === st.accent));
+      document.querySelectorAll("#bgs button").forEach((b) => b.classList.toggle("on", b.dataset.k === st.bg));
+      document.querySelectorAll("#radius button").forEach((b) => b.classList.toggle("on", +b.dataset.v === st.r));
+      document.querySelectorAll("#density button").forEach((b) => b.classList.toggle("on", b.dataset.v === st.d));
+    }
+    function bindTheme() {
+      const acc = document.getElementById("accents");
+      ACCENTS.forEach((a, i) => { const b = document.createElement("button"); b.title = a.n; b.style.background = `linear-gradient(135deg, ${a.a1}, ${a.a2})`; b.onclick = () => { st.accent = i; apply(); }; acc.appendChild(b); });
+      const bgs = document.getElementById("bgs");
+      Object.entries(BGS).forEach(([k, v]) => {
+        const b = document.createElement("button"); b.dataset.k = k; b.textContent = v.n;
+        b.style.background = k === "upload" ? "repeating-linear-gradient(45deg, #222 0 6px, #2c2c3c 6px 12px)" : v.css;
+        b.onclick = () => {
+          if (k !== "upload") { st.bg = k; return apply(); }
+          const f = document.createElement("input"); f.type = "file"; f.accept = "image/*";
+          f.onchange = () => { if (f.files[0]) { st.custom = URL.createObjectURL(f.files[0]); st.bg = "upload"; apply(); } };
+          f.click();
+        };
+        bgs.appendChild(b);
+      });
+      document.getElementById("op").oninput = (e) => { st.op = +e.target.value; apply(); };
+      document.querySelectorAll("#radius button").forEach((b) => b.onclick = () => { st.r = +b.dataset.v; apply(); });
+      document.querySelectorAll("#density button").forEach((b) => b.onclick = () => { st.d = b.dataset.v; apply(); });
+      document.getElementById("reset").onclick = () => { st = Object.assign({}, DEFAULT); apply(); };
+      syncThemeUI();
+    }
+    apply();
+    show("home", null, false);
+  </script>
+  <script src="nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nexo · Constelação 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  /* Tudo que é personalizável vira variável. Sem blur: as superfícies são cor sólida com alfa. */
+  :root {
+    --a1: #a78bfa; --a2: #22d3ee; --a3: #f472b6;
+    --grad: linear-gradient(135deg, var(--a1), var(--a2));
+    --panel-alpha: .92;
+    --surface: rgba(17, 18, 34, var(--panel-alpha));
+    --surface-2: rgba(28, 30, 52, var(--panel-alpha));
+    --surface-3: rgba(40, 42, 70, .9);
+    --edge: rgba(255,255,255,.08);
+    --text: #eef0ff; --dim: #a6a9c9; --dimmer: #6f7398;
+    --r: 18px; --gap: 12px; --pad: 14px;
+    --bg-layer: radial-gradient(900px 600px at 15% 10%, rgba(124,58,237,.35), transparent 60%), radial-gradient(800px 600px at 90% 90%, rgba(8,145,178,.30), transparent 60%), radial-gradient(600px 400px at 60% 40%, rgba(244,114,182,.10), transparent 70%), #05060d;
+    --stars: .5;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { color: var(--text); font: 14.5px/1.5 Inter, system-ui, sans-serif; background: var(--bg-layer); background-size: cover; background-position: center; transition: background .3s; }
+  .stars { position: fixed; inset: 0; pointer-events: none; opacity: var(--stars);
+    background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(1px 1px at 90% 10%, #fff, transparent), radial-gradient(1.5px 1.5px at 80% 50%, #cfe, transparent), radial-gradient(1px 1px at 20% 90%, #fff, transparent);
+    background-size: 600px 600px; animation: drift 140s linear infinite; }
+  @keyframes drift { to { background-position: 600px 300px; } }
+  h1, h2, h3, .sg { font-family: "Space Grotesk", Inter, sans-serif; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  i.ph, i.ph-duotone, i.ph-fill { font-size: 19px; }
+  .panel { background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r); }
+  .ibtn { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: var(--dim); position: relative; }
+  .ibtn:hover, .ibtn.on { background: var(--surface-2); color: var(--text); }
+  .ibtn .badge { position: absolute; top: 3px; right: 3px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--a3); color: #1a0b14; font-size: 10px; font-weight: 700; display: grid; place-items: center; }
+  .av { border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #0b0b18; flex: none; position: relative; }
+
+  .app { position: relative; height: 100%; display: grid; grid-template-rows: 64px 1fr; gap: var(--gap); padding: var(--gap); }
+
+  /* ---------- topo: planetas na horizontal ---------- */
+  .top { display: flex; align-items: center; gap: 14px; padding: 0 10px 0 14px; }
+  .logo { width: 38px; height: 38px; border-radius: 12px; background: var(--grad); color: #0b0b18; display: grid; place-items: center; font: 700 18px "Space Grotesk"; }
+  .planets { display: flex; align-items: center; gap: 12px; padding: 0 6px; }
+  .planet { width: 38px; height: 38px; border-radius: 50%; position: relative; display: grid; place-items: center; font: 700 12px "Space Grotesk"; cursor: pointer; transition: transform .2s; }
+  .planet:hover { transform: scale(1.08); }
+  .planet.on::before { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid transparent; background: var(--grad) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: spin 6s linear infinite; }
+  .planet.on::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--a2); box-shadow: 0 0 8px var(--a2); top: -6px; left: 50%; transform-origin: 0 25px; animation: spin 6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .planet .ping { position: absolute; right: -2px; top: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--a3); border: 2px solid #12132a; }
+  .planet.ghost { background: var(--surface-2); color: var(--dim); }
+  .vsep { width: 1px; height: 26px; background: var(--edge); }
+  .srvname { display: flex; flex-direction: column; line-height: 1.2; margin-left: 4px; }
+  .srvname b { font: 600 17px "Space Grotesk"; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .srvname small { color: var(--dimmer); font-size: 12px; }
+  .search { margin-left: auto; display: flex; align-items: center; gap: 8px; width: 300px; padding: 8px 12px; border-radius: 12px; background: var(--surface-2); color: var(--dimmer); }
+  .search kbd { margin-left: auto; font: 11px Inter; padding: 1px 6px; border-radius: 6px; background: var(--surface-3); color: var(--dim); }
+  .mechip { display: flex; align-items: center; gap: 8px; padding: 3px 12px 3px 3px; border-radius: 999px; background: var(--surface-2); }
+  .mechip .st, .row .st { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #12132a; background: #34d399; }
+
+  /* ---------- corpo ---------- */
+  .body { display: grid; grid-template-columns: 240px 1fr 316px; gap: var(--gap); min-height: 0; }
+
+  .side { padding: var(--pad) 10px; display: flex; flex-direction: column; gap: 2px; min-height: 0; }
+  .side h4 { margin: 12px 10px 4px; font: 600 11px Inter; letter-spacing: .1em; text-transform: uppercase; color: var(--dimmer); display: flex; justify-content: space-between; align-items: center; }
+  .side h4 i { font-size: 14px; cursor: pointer; }
+  .side a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; color: var(--dim); text-decoration: none; position: relative; }
+  .side a:hover { background: var(--surface-2); color: var(--text); }
+  .side a.on { background: color-mix(in srgb, var(--a1) 20%, transparent); color: var(--text); }
+  .side a.on::before { content: ""; position: absolute; left: -10px; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--grad); }
+  .side a .n { margin-left: auto; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--a3); color: #1a0b14; }
+  .side a .orbs { margin-left: auto; display: flex; gap: 3px; }
+  .side a .orbs span { width: 8px; height: 8px; border-radius: 50%; }
+  .side a .lk { margin-left: auto; font-size: 13px; color: var(--dimmer); }
+  .dock { margin-top: auto; padding: 10px; border-radius: 14px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
+  .dock .st { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #34d399; font-weight: 600; }
+  .dock .st small { color: var(--dimmer); font-weight: 400; }
+  .dock .bt { display: grid; grid-template-columns: repeat(4,1fr); gap: 6px; }
+  .dock .bt button { height: 34px; border-radius: 10px; background: var(--surface-3); display: grid; place-items: center; color: var(--text); }
+  .dock .bt button.hang { background: rgba(244,63,94,.22); color: #fb7185; }
+
+  /* chat no centro */
+  .chat { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .chat header { padding: 12px 16px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--edge); }
+  .chat header h3 { margin: 0; font-size: 18px; }
+  .chat header small { color: var(--dimmer); }
+  .livecap { margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 5px 6px 5px 12px; border-radius: 999px; background: color-mix(in srgb, var(--a3) 14%, transparent); border: 1px solid color-mix(in srgb, var(--a3) 40%, transparent); font-size: 13px; }
+  .livecap .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a3); animation: pulse 1.4s infinite; }
+  .livecap button { background: var(--a3); color: #1a0b14; padding: 4px 12px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .msgs { flex: 1; overflow-y: auto; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .sys { align-self: center; font-size: 12px; color: var(--dimmer); display: flex; align-items: center; gap: 8px; }
+  .sys::before, .sys::after { content: ""; width: 60px; height: 1px; background: var(--edge); }
+  .card { display: flex; gap: 12px; max-width: 72%; }
+  .card .av { width: 36px; height: 36px; font-size: 14px; }
+  .bubble { background: var(--surface-2); border: 1px solid var(--edge); border-radius: 18px; border-top-left-radius: 6px; padding: 10px 14px; }
+  .bubble .who { display: flex; gap: 8px; align-items: baseline; font-size: 13px; margin-bottom: 3px; }
+  .bubble .who b { font-family: "Space Grotesk"; }
+  .bubble .who small { color: var(--dimmer); font-size: 11px; }
+  .card.mine { align-self: flex-end; flex-direction: row-reverse; }
+  .card.mine .bubble { border-radius: 18px; border-top-right-radius: 6px; border: 1px solid transparent; background: linear-gradient(var(--surface-2), var(--surface-2)) padding-box, var(--grad) border-box; }
+  .mention { color: var(--a2); background: color-mix(in srgb, var(--a2) 14%, transparent); padding: 0 4px; border-radius: 5px; }
+  .reacts { display: flex; gap: 6px; margin-top: 8px; }
+  .reacts span { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--surface-3); border: 1px solid var(--edge); }
+  .reacts span.mine { border-color: var(--a1); background: color-mix(in srgb, var(--a1) 22%, transparent); }
+  .shot { margin-top: 8px; width: 300px; height: 168px; border-radius: 14px; background: radial-gradient(circle at 30% 40%, var(--a3), transparent 50%), radial-gradient(circle at 70% 70%, var(--a2), transparent 50%), #1b1640; position: relative; overflow: hidden; }
+  .shot::after { content: "clutch.png · 2,1 MB"; position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: #fff; background: rgba(0,0,0,.45); padding: 2px 8px; border-radius: 6px; }
+  .quote { font-size: 12px; color: var(--dim); border-left: 2px solid var(--a1); padding-left: 8px; margin-bottom: 6px; }
+  .typing { padding: 0 22px 6px; font-size: 12px; color: var(--dimmer); }
+  .composer { margin: 0 14px 14px; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 10px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--edge); }
+  .composer input { flex: 1; border: 0; outline: none; background: none; color: var(--text); font: inherit; padding: 8px 4px; }
+  .composer input::placeholder { color: var(--dimmer); }
+  .send { width: 40px; height: 40px; border-radius: 13px; background: var(--grad); color: #0b0b18; display: grid; place-items: center; }
+
+  /* direita */
+  .right { display: flex; flex-direction: column; gap: var(--gap); min-height: 0; }
+  .box { padding: var(--pad); }
+  .box h3 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .box > small { color: var(--dimmer); }
+  .orbit { position: relative; height: 210px; margin-top: 10px; }
+  .ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px dashed var(--edge); transform: translate(-50%,-50%); }
+  .core { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; transform: translate(-50%,-50%); border-radius: 50%; background: var(--grad); display: grid; place-items: center; color: #0b0b18; }
+  .bub { position: absolute; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); }
+  .bub .av { width: 44px; height: 44px; font-size: 15px; }
+  .bub.talk .av { box-shadow: 0 0 0 3px color-mix(in srgb, var(--a1) 50%, transparent), 0 0 0 7px color-mix(in srgb, var(--a1) 15%, transparent); animation: talk 1.1s ease-in-out infinite; }
+  @keyframes talk { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--a1) 50%, transparent), 0 0 0 11px color-mix(in srgb, var(--a1) 5%, transparent); } }
+  .bub .mut { position: absolute; top: 28px; right: -4px; width: 20px; height: 20px; border-radius: 50%; background: #2a1030; display: grid; place-items: center; color: var(--a3); }
+  .bub .mut i { font-size: 12px; }
+  .lthumb { position: relative; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; margin-top: 10px; background: linear-gradient(160deg, #1e3a8a 0%, color-mix(in srgb, var(--a1) 80%, #000) 55%, var(--a3) 100%); }
+  .lthumb::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: #0b0b18; clip-path: polygon(0 70%, 20% 30%, 35% 60%, 55% 15%, 75% 55%, 100% 25%, 100% 100%, 0 100%); opacity: .85; }
+  .lthumb .tag { position: absolute; left: 10px; top: 10px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--a3); color: #1a0b14; }
+  .lthumb .v { position: absolute; right: 10px; top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.5); }
+  .lthumb .pl { position: absolute; inset: 0; display: grid; place-items: center; }
+  .lthumb .pl span { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.92); color: #0b0b18; display: grid; place-items: center; }
+  .lmeta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .lmeta small { color: var(--dimmer); }
+  .crew { flex: 1; min-height: 0; overflow-y: auto; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 12px; }
+  .row:hover { background: var(--surface-2); }
+  .row small { color: var(--dimmer); display: block; font-size: 12px; }
+  .row .ic { margin-left: auto; font-size: 15px; }
+
+  /* ---------- personalizar ---------- */
+  .panel.theme { position: fixed; top: 86px; right: 24px; width: 320px; z-index: 50; padding: 16px; display: none; background: #0e0f1e; box-shadow: 0 20px 50px rgba(0,0,0,.55); }
+  .panel.theme.open { display: block; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.12); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.2); }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-button { background: transparent; display: none; }
+  .theme h3 { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .theme p { margin: 0 0 10px; color: var(--dimmer); font-size: 12.5px; }
+  .theme label { display: block; font: 600 11px Inter; letter-spacing: .08em; text-transform: uppercase; color: var(--dimmer); margin: 14px 0 8px; }
+  .sw { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sw button { width: 40px; height: 40px; border-radius: 12px; border: 2px solid transparent; }
+  .sw button.on { border-color: #fff; }
+  .bgs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .bgs button { height: 48px; border-radius: 10px; border: 2px solid transparent; font-size: 10px; color: #fff; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; text-shadow: 0 1px 2px #000; }
+  .bgs button.on { border-color: #fff; }
+  input[type=range] { width: 100%; accent-color: var(--a1); }
+  .seg { display: flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+  .seg button { flex: 1; padding: 6px; border-radius: 8px; font-size: 12px; color: var(--dim); }
+  .seg button.on { background: var(--surface-3); color: var(--text); }
+  .theme .reset { margin-top: 14px; width: 100%; padding: 8px; border-radius: 10px; background: var(--surface-2); color: var(--dim); font-size: 13px; }
+</style>
+</head>
+<body>
+  <div class="stars"></div>
+  <div class="app">
+    <header class="top panel">
+      <div class="logo">n</div>
+      <div class="planets">
+        <div class="planet on" style="background:radial-gradient(circle at 30% 30%, #c4b5fd, #6d28d9)" title="Os Brabos">OB</div>
+        <div class="planet" style="background:radial-gradient(circle at 30% 30%, #67e8f9, #0e7490)" title="Faculdade">FA<span class="ping"></span></div>
+        <div class="planet" style="background:radial-gradient(circle at 30% 30%, #f9a8d4, #be185d)" title="Família">FM</div>
+        <div class="planet ghost" title="Novo servidor"><i class="ph ph-plus"></i></div>
+      </div>
+      <div class="vsep"></div>
+      <div class="srvname"><b>Os Brabos</b><small>6 online · cifrado ponta a ponta</small></div>
+      <div class="search"><i class="ph ph-magnifying-glass"></i> Buscar ou pular para… <kbd>Ctrl K</kbd></div>
+      <button class="ibtn" title="Amigos e diretas"><i class="ph-duotone ph-chats-circle"></i><span class="badge">2</span></button>
+      <button class="ibtn" title="Notificações"><i class="ph-duotone ph-bell"></i></button>
+      <button class="ibtn" id="themeBtn" title="Personalizar"><i class="ph-duotone ph-palette"></i></button>
+      <div class="mechip"><div class="av" style="width:30px;height:30px;font-size:12px;background:var(--a2)">E<span class="st"></span></div><b class="sg">enrell</b></div>
+    </header>
+
+    <div class="body">
+      <aside class="side panel">
+        <h4>Canais <i class="ph ph-plus"></i></h4>
+        <a class="on" href="#"><i class="ph ph-hash"></i>geral</a>
+        <a href="#"><i class="ph ph-hash"></i>clips-e-links<span class="n">4</span></a>
+        <a href="#"><i class="ph ph-hash"></i>memes</a>
+        <a href="#"><i class="ph ph-hash"></i>admins<i class="ph-fill ph-lock-simple lk"></i></a>
+        <h4>Voz</h4>
+        <a href="#"><i class="ph-duotone ph-planet"></i>Sala principal<span class="orbs"><span style="background:var(--a1)"></span><span style="background:var(--a2)"></span><span style="background:var(--a3)"></span></span></a>
+        <a href="#"><i class="ph-duotone ph-game-controller"></i>Jogando</a>
+        <h4>Ao vivo</h4>
+        <a href="#"><i class="ph-fill ph-broadcast" style="color:var(--a3)"></i>Rafa · Ranqueada</a>
+        <div class="dock">
+          <div class="st"><i class="ph-fill ph-cell-signal-full"></i>Na Sala principal <small>· 32 ms</small></div>
+          <div class="bt"><button title="Microfone"><i class="ph-duotone ph-microphone"></i></button><button title="Áudio"><i class="ph-duotone ph-headphones"></i></button><button title="Transmitir"><i class="ph-duotone ph-screencast"></i></button><button class="hang" title="Sair"><i class="ph-fill ph-phone-x"></i></button></div>
+        </div>
+      </aside>
+
+      <main class="chat panel">
+        <header>
+          <i class="ph ph-hash" style="font-size:22px;color:var(--a1)"></i>
+          <div><h3>geral</h3><small>conversa principal da galera</small></div>
+          <div class="livecap"><span class="dot"></span>Rafa está ao vivo<button>Assistir</button></div>
+          <button class="ibtn"><i class="ph ph-push-pin"></i></button><button class="ibtn"><i class="ph ph-magnifying-glass"></i></button><button class="ibtn"><i class="ph ph-users-three"></i></button>
+        </header>
+        <div class="msgs">
+          <div class="sys">hoje</div>
+          <div class="card"><div class="av" style="background:var(--a1)">R</div><div class="bubble"><div class="who"><b>Rafa</b><small>21:03</small></div>salve galera, <b>hoje tem live</b> às 21h 🎮</div></div>
+          <div class="card"><div class="av" style="background:var(--a3)">M</div><div class="bubble"><div class="who"><b>Mari</b><small>21:04</small></div>olha esse clutch de ontem<div class="shot"></div><div class="reacts"><span class="mine">🔥 3</span><span>😂 1</span></div></div></div>
+          <div class="card"><div class="av" style="background:var(--a1)">R</div><div class="bubble"><div class="who"><b>Rafa</b><small>21:06</small></div><span class="mention">@enrell</span> abre a sala de voz ae</div></div>
+          <div class="card mine"><div class="av" style="background:var(--a2)">E</div><div class="bubble"><div class="quote">Rafa: @enrell abre a sala de voz ae</div>já abri, entra lá ✨<div class="who" style="justify-content:flex-end;margin:4px 0 0"><small>21:06 · entregue</small></div></div></div>
+          <div class="sys">Lu pediu para entrar · aguardando aprovação</div>
+        </div>
+        <div class="typing">Mari está digitando…</div>
+        <div class="composer"><button class="ibtn"><i class="ph ph-paperclip"></i></button><input placeholder="Mensagem para #geral" /><button class="ibtn"><i class="ph ph-smiley-wink"></i></button><button class="send"><i class="ph-fill ph-paper-plane-tilt"></i></button></div>
+      </main>
+
+      <aside class="right">
+        <div class="panel box">
+          <h3><i class="ph-duotone ph-planet" style="color:var(--a2)"></i> Sala principal</h3>
+          <small>3 em órbita · você está aqui</small>
+          <div class="orbit">
+            <div class="ring" style="width:196px;height:196px"></div>
+            <div class="ring" style="width:124px;height:124px"></div>
+            <div class="core"><i class="ph-fill ph-waveform" style="font-size:24px"></i></div>
+            <div class="bub talk" style="left:50%;top:11%"><div class="av" style="background:var(--a1)">R</div>Rafa</div>
+            <div class="bub" style="left:17%;top:76%"><div class="av" style="background:var(--a2)">E</div>você</div>
+            <div class="bub" style="left:83%;top:76%"><div class="av" style="background:var(--a3)">M</div><span class="mut"><i class="ph-fill ph-microphone-slash"></i></span>Mari</div>
+          </div>
+        </div>
+        <div class="panel box">
+          <h3><i class="ph-fill ph-broadcast" style="color:var(--a3)"></i> Ao vivo</h3>
+          <div class="lthumb"><span class="tag">AO VIVO</span><span class="v">3 · 1080p60</span><div class="pl"><span><i class="ph-fill ph-play"></i></span></div></div>
+          <div class="lmeta"><div class="av" style="width:30px;height:30px;font-size:12px;background:var(--a1)">R</div><div><b class="sg">Rafa</b><br /><small>Ranqueada · há 24 min</small></div></div>
+        </div>
+        <div class="panel box crew">
+          <h3><i class="ph-duotone ph-users-three"></i> Tripulação</h3>
+          <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:var(--a2)">E<span class="st"></span></div><div>enrell<small>dono</small></div><i class="ph-fill ph-crown ic" style="color:#fbbf24"></i></div>
+          <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:var(--a1)">R<span class="st"></span></div><div>Rafa<small>transmitindo</small></div><i class="ph-fill ph-shield-star ic" style="color:var(--a1)"></i></div>
+          <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:var(--a3)">M<span class="st"></span></div><div>Mari<small>na voz</small></div></div>
+          <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:#fbbf24">L<span class="st" style="background:#fbbf24"></span></div><div>Lu<small>aguardando aprovação</small></div><i class="ph ph-door-open ic" style="color:#fbbf24"></i></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- personalização (funciona de verdade nesta prévia) -->
+  <div class="panel theme" id="theme">
+    <h3><i class="ph-duotone ph-palette"></i> Personalizar</h3>
+    <p>Tudo aqui é cor sólida com transparência, sem blur, então qualquer fundo combina.</p>
+    <label>Cores de destaque</label>
+    <div class="sw" id="accents"></div>
+    <label>Fundo</label>
+    <div class="bgs" id="bgs"></div>
+    <label>Opacidade dos painéis: <span id="opv"></span></label>
+    <input type="range" id="op" min="55" max="100" />
+    <label>Cantos</label>
+    <div class="seg" id="radius"><button data-v="8">retos</button><button data-v="18">redondos</button><button data-v="26">bem redondos</button></div>
+    <label>Densidade</label>
+    <div class="seg" id="density"><button data-v="compact">compacta</button><button data-v="normal">normal</button><button data-v="airy">arejada</button></div>
+    <button class="reset" id="reset"><i class="ph ph-arrow-counter-clockwise"></i> Voltar ao padrão</button>
+  </div>
+
+  <script>
+    const ACCENTS = [
+      { a1: "#a78bfa", a2: "#22d3ee", a3: "#f472b6", n: "Constelação" },
+      { a1: "#fb7185", a2: "#fbbf24", a3: "#f472b6", n: "Pôr do sol" },
+      { a1: "#34d399", a2: "#22d3ee", a3: "#a3e635", n: "Aurora" },
+      { a1: "#60a5fa", a2: "#818cf8", a3: "#38bdf8", n: "Oceano" },
+      { a1: "#e5e7eb", a2: "#9ca3af", a3: "#f87171", n: "Grafite" },
+    ];
+    const BGS = {
+      nebula: { n: "Nebulosa", css: "radial-gradient(900px 600px at 15% 10%, rgba(124,58,237,.35), transparent 60%), radial-gradient(800px 600px at 90% 90%, rgba(8,145,178,.30), transparent 60%), radial-gradient(600px 400px at 60% 40%, rgba(244,114,182,.10), transparent 70%), #05060d", stars: .5 },
+      aurora: { n: "Aurora", css: "radial-gradient(1000px 500px at 50% -10%, rgba(52,211,153,.35), transparent 60%), radial-gradient(800px 500px at 100% 100%, rgba(34,211,238,.22), transparent 60%), #040a0c", stars: .35 },
+      solid: { n: "Sólido", css: "#0d0e1a", stars: 0 },
+      dusk: { n: "Crepúsculo", css: "linear-gradient(160deg, #1a1033 0%, #3b1438 50%, #0d0b18 100%)", stars: .25 },
+      img1: { n: "Montanhas", css: "linear-gradient(rgba(5,6,13,.25), rgba(5,6,13,.55)), url('https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1920&q=70') center/cover", stars: 0 },
+      img2: { n: "Cidade", css: "linear-gradient(rgba(5,6,13,.3), rgba(5,6,13,.6)), url('https://images.unsplash.com/photo-1514565131-fce0801e5785?w=1920&q=70') center/cover", stars: 0 },
+      img3: { n: "Floresta", css: "linear-gradient(rgba(5,6,13,.3), rgba(5,6,13,.6)), url('https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=70') center/cover", stars: 0 },
+      upload: { n: "Sua imagem", css: null, stars: 0 },
+    };
+    const DENS = { compact: ["8px", "10px"], normal: ["12px", "14px"], airy: ["18px", "20px"] };
+    const DEFAULT = { accent: 0, bg: "nebula", op: 92, r: 18, d: "normal", custom: null };
+    let st = Object.assign({}, DEFAULT, JSON.parse(localStorage.getItem("nexo-theme-preview") || "{}"));
+    const root = document.documentElement.style;
+
+    function apply() {
+      const a = ACCENTS[st.accent];
+      root.setProperty("--a1", a.a1); root.setProperty("--a2", a.a2); root.setProperty("--a3", a.a3);
+      const bg = BGS[st.bg];
+      const css = st.bg === "upload" && st.custom ? `linear-gradient(rgba(5,6,13,.3), rgba(5,6,13,.55)), url('${st.custom}') center/cover` : bg.css || BGS.nebula.css;
+      document.body.style.background = css;
+      root.setProperty("--stars", bg.stars);
+      root.setProperty("--panel-alpha", st.op / 100);
+      root.setProperty("--r", st.r + "px");
+      root.setProperty("--gap", DENS[st.d][0]); root.setProperty("--pad", DENS[st.d][1]);
+      document.getElementById("opv").textContent = st.op + "%";
+      document.getElementById("op").value = st.op;
+      document.querySelectorAll("#accents button").forEach((b, i) => b.classList.toggle("on", i === st.accent));
+      document.querySelectorAll("#bgs button").forEach((b) => b.classList.toggle("on", b.dataset.k === st.bg));
+      document.querySelectorAll("#radius button").forEach((b) => b.classList.toggle("on", +b.dataset.v === st.r));
+      document.querySelectorAll("#density button").forEach((b) => b.classList.toggle("on", b.dataset.v === st.d));
+      const save = Object.assign({}, st); if (save.custom && save.custom.startsWith("blob:")) save.custom = null;
+      localStorage.setItem("nexo-theme-preview", JSON.stringify(save));
+    }
+    const acc = document.getElementById("accents");
+    ACCENTS.forEach((a, i) => { const b = document.createElement("button"); b.title = a.n; b.style.background = `linear-gradient(135deg, ${a.a1}, ${a.a2})`; b.onclick = () => { st.accent = i; apply(); }; acc.appendChild(b); });
+    const bgs = document.getElementById("bgs");
+    Object.entries(BGS).forEach(([k, v]) => {
+      const b = document.createElement("button"); b.dataset.k = k; b.textContent = v.n;
+      b.style.background = k === "upload" ? "repeating-linear-gradient(45deg, #222 0 6px, #2c2c3c 6px 12px)" : v.css;
+      b.style.backgroundSize = "cover";
+      b.onclick = () => {
+        if (k !== "upload") { st.bg = k; return apply(); }
+        const f = document.createElement("input"); f.type = "file"; f.accept = "image/*";
+        f.onchange = () => { if (f.files[0]) { st.custom = URL.createObjectURL(f.files[0]); st.bg = "upload"; apply(); } };
+        f.click();
+      };
+      bgs.appendChild(b);
+    });
+    document.getElementById("op").oninput = (e) => { st.op = +e.target.value; apply(); };
+    document.querySelectorAll("#radius button").forEach((b) => b.onclick = () => { st.r = +b.dataset.v; apply(); });
+    document.querySelectorAll("#density button").forEach((b) => b.onclick = () => { st.d = b.dataset.v; apply(); });
+    document.getElementById("reset").onclick = () => { st = Object.assign({}, DEFAULT); apply(); };
+    const panel = document.getElementById("theme"), btn = document.getElementById("themeBtn");
+    btn.onclick = (e) => { e.stopPropagation(); panel.classList.toggle("open"); btn.classList.toggle("on"); };
+    document.addEventListener("click", (e) => { if (!panel.contains(e.target) && e.target !== btn) { panel.classList.remove("open"); btn.classList.remove("on"); } });
+    apply();
+    // abre o painel na primeira visita para mostrar que dá para mexer
+    if (!localStorage.getItem("nexo-theme-seen")) { panel.classList.add("open"); btn.classList.add("on"); localStorage.setItem("nexo-theme-seen", "1"); }
+  </script>
+  <script src="nav.js"></script>
+</body>
+</html>

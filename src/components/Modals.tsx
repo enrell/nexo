@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { COLORS, app, randomColor, useApp } from "../lib/app";
 import { mediaErrorMessage } from "../lib/rtc";
 import { selfId, type Session } from "../lib/session";
 import { PRESETS, decodeInvite, encodeInvite, inviteLink, storage } from "../lib/storage";
+import { planetGradient } from "../lib/theme";
 import type { StreamPreset } from "../lib/types";
 import { Avatar, Icons, Modal } from "./common";
-import { initials } from "./Sidebar";
+import { initials } from "./Shell";
 
 export function Splash() {
   return (
@@ -79,23 +80,58 @@ export function Onboarding() {
   );
 }
 
+/** Início (planeta da casinha): visão geral fora dos servidores. Amigos e diretas chegam aqui. */
 export function Home({ onAdd }: { onAdd: () => void }) {
+  const a = useApp();
   return (
-    <div className="empty home">
-      <img src="./logo.svg" alt="" width={96} height={96} />
-      <h1>Bem-vindo(a) ao Nexo</h1>
-      <ol className="steps">
-        <li>
-          <strong>Crie um servidor</strong> para você e seus amigos.
-        </li>
-        <li>
-          <strong>Mande o link de convite</strong> — quem clicar entra direto (ou cola o código).
-        </li>
-        <li>
-          <strong>Entre na sala de voz</strong> e clique em <em>Transmitir</em> para fazer live.
-        </li>
-      </ol>
-      <button className="btn" onClick={onAdd}>
+    <div className="home-view">
+      <div className="home-hero">
+        <img src="./logo.svg" alt="" width={64} height={64} />
+        <div>
+          <h1>Olá, {a.effectiveProfile().name}</h1>
+          <p className="dim">{a.servers.length ? "Escolha um servidor no topo ou veja o que está acontecendo à direita." : "Você ainda não está em nenhum servidor."}</p>
+        </div>
+      </div>
+      {a.servers.length > 0 && (
+        <div className="home-grid">
+          {a.servers.map((srv) => {
+            const sess = a.sessions.get(srv.sid);
+            const online = sess ? Object.values(sess.peers).filter((p) => p.profile).length : 0;
+            const unread = a.unreadFor(srv.sid);
+            return (
+              <button key={srv.sid} className="home-card" onClick={() => a.selectServer(srv.roomId)}>
+                <span className="emb big" style={{ background: planetGradient(srv.sid) }}>
+                  {initials(srv.name)}
+                </span>
+                <span className="home-card-txt">
+                  <b className="ellipsis">{srv.name}</b>
+                  <small>
+                    {online} online{unread ? ` · ${unread} novas` : ""}
+                  </small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      <div className="home-steps">
+        <div>
+          <span className="n">1</span>
+          <b>Crie um servidor</b>
+          <small>para você e seus amigos.</small>
+        </div>
+        <div>
+          <span className="n">2</span>
+          <b>Mande o convite</b>
+          <small>quem clicar no link entra direto (e espera sua aprovação).</small>
+        </div>
+        <div>
+          <span className="n">3</span>
+          <b>Entre na voz e transmita</b>
+          <small>a live vai direto de PC pra PC, cifrada.</small>
+        </div>
+      </div>
+      <button className="btn big" onClick={onAdd}>
         Criar ou entrar em um servidor
       </button>
     </div>
@@ -237,9 +273,9 @@ export function PromptModal(props: { title: string; label: string; initial?: str
   );
 }
 
-export function GoLiveModal({ s, onClose }: { s: Session; onClose: () => void }) {
+export function GoLiveModal({ s, onClose, initialKind = "screen" }: { s: Session; onClose: () => void; initialKind?: "screen" | "camera" }) {
   const a = useApp();
-  const [kind, setKind] = useState<"screen" | "camera">("screen");
+  const [kind, setKind] = useState<"screen" | "camera">(initialKind);
   const [sources, setSources] = useState<NexoSource[] | null>(null);
   const [sel, setSel] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "screens" | "windows">("all");
@@ -368,90 +404,5 @@ export function GoLiveModal({ s, onClose }: { s: Session; onClose: () => void })
       </label>
       {kind === "screen" && audio && <div className="dim small">Dica: use fone de ouvido. Se a voz dos amigos aparecer na live, transmita uma janela específica em vez da tela inteira.</div>}
     </Modal>
-  );
-}
-
-/** Ctrl+K: pular para qualquer servidor/canal. */
-export function QuickSwitcher({ onClose }: { onClose: () => void }) {
-  const a = useApp();
-  const [q, setQ] = useState("");
-  const [sel, setSel] = useState(0);
-  const listRef = useRef<HTMLDivElement>(null);
-  const items = useMemo(() => {
-    const out: { label: string; sub: string; go: () => void; kind: "server" | "channel" | "live" }[] = [];
-    for (const srv of a.servers) {
-      const s = a.sessions.get(srv.sid);
-      out.push({ label: srv.name, sub: "Servidor", kind: "server", go: () => a.selectServer(srv.roomId) });
-      if (!s) continue;
-      for (const c of s.state.channels)
-        out.push({
-          label: c.name,
-          sub: srv.name,
-          kind: "channel",
-          go: () => {
-            a.selectServer(srv.roomId);
-            a.selectChannel(c.id);
-          },
-        });
-      for (const [id, p] of Object.entries(s.peers))
-        if (p.live)
-          out.push({
-            label: `${p.profile?.name ?? "?"} — ${p.live.title}`,
-            sub: `Ao vivo em ${srv.name}`,
-            kind: "live",
-            go: () => {
-              a.selectServer(srv.roomId);
-              a.openLive(id);
-            },
-          });
-    }
-    const t = q.toLowerCase().replace(/^#/, "");
-    return t ? out.filter((i) => i.label.toLowerCase().includes(t) || i.sub.toLowerCase().includes(t)) : out;
-  }, [q, a, a.servers]);
-
-  useEffect(() => setSel(0), [q]);
-  useEffect(() => {
-    listRef.current?.children[sel]?.scrollIntoView({ block: "nearest" });
-  }, [sel]);
-
-  return (
-    <div className="modal-backdrop" onMouseDown={onClose}>
-      <div className="switcher" onMouseDown={(e) => e.stopPropagation()}>
-        <input
-          autoFocus
-          placeholder="Para onde você quer ir?"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onClose();
-            if (e.key === "ArrowDown") (e.preventDefault(), setSel(Math.min(items.length - 1, sel + 1)));
-            if (e.key === "ArrowUp") (e.preventDefault(), setSel(Math.max(0, sel - 1)));
-            if (e.key === "Enter" && items[sel]) {
-              items[sel].go();
-              onClose();
-            }
-          }}
-        />
-        <div className="switcher-list" ref={listRef}>
-          {items.slice(0, 50).map((it, i) => (
-            <button
-              key={i}
-              className={i === sel ? "on" : ""}
-              onMouseEnter={() => setSel(i)}
-              onClick={() => {
-                it.go();
-                onClose();
-              }}
-            >
-              <span className="sw-icon">{it.kind === "channel" ? <Icons.Hash size={16} /> : it.kind === "live" ? <span className="live-dot" /> : <Icons.Home size={16} />}</span>
-              <span className="ellipsis">{it.label}</span>
-              <span className="dim small ellipsis">{it.sub}</span>
-            </button>
-          ))}
-          {items.length === 0 && <div className="dim small pad">Nada encontrado</div>}
-        </div>
-        <div className="dim small switcher-hint">↑↓ para navegar · Enter para abrir · Esc para fechar</div>
-      </div>
-    </div>
   );
 }

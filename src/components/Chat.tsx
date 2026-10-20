@@ -3,6 +3,8 @@ import { useApp } from "../lib/app";
 import { db } from "../lib/db";
 import { MAX_FILE, type Session } from "../lib/session";
 import type { Attachment, MsgView } from "../lib/types";
+import { PaperPlaneTilt, PlusCircle, SidebarSimple } from "@phosphor-icons/react";
+import { selfId } from "../lib/session";
 import { Avatar, Icons, dateLabel, formatBytes, timeLabel } from "./common";
 import { openMenu, type MenuItem } from "./ContextMenu";
 import { EMOJI_GROUPS, QUICK_REACTIONS } from "./emoji";
@@ -19,7 +21,7 @@ export function ChatView({ s, compact }: { s: Session; compact?: boolean }) {
   const channel = s.state.channels.find((c) => c.id === channelId) ?? { id: channelId, name: channelId };
   const all = s.state.messages.get(channelId) ?? [];
   const [limit, setLimit] = useState(PAGE);
-  const [query, setQuery] = useState("");
+  const query = "";
   const [replyTo, setReplyTo] = useState<MsgView | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -34,7 +36,6 @@ export function ChatView({ s, compact }: { s: Session; compact?: boolean }) {
     setLimit(PAGE);
     setReplyTo(null);
     setEditing(null);
-    setQuery("");
     setLastReadAtOpen(a.lastRead[readKey] ?? 0);
     stick.current = true;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,26 +115,24 @@ export function ChatView({ s, compact }: { s: Session; compact?: boolean }) {
       }}
     >
       {!compact && (
-        <header className="main-head">
-          <Icons.Hash />
-          <span className="strong">{channel.name}</span>
-          <span className="head-sep" />
-          <span className="dim small ellipsis">Histórico guardado e assinado por todos os membros</span>
-          <div className="grow" />
+        <header className="main-head chat-head">
+          <div className="head-title">
+            <h3>
+              <Icons.Hash size={18} />
+              {channel.name}
+            </h3>
+            <small>Histórico guardado e assinado por todos os membros</small>
+          </div>
+          <LiveCapsule s={s} />
           <ChannelBell s={s} channelId={channelId} />
-          <button className={"icon-btn" + (a.showMembers ? " active" : "")} title="Lista de membros" onClick={() => a.toggleMembers()}>
+          <button className={"ibtn" + (a.ctx.view === "members" && !a.settings.ctxCollapsed ? " on" : "")} data-tip="Membros" aria-label="Membros" onClick={() => a.toggleMembers()}>
             <Icons.Users />
           </button>
-          <div className="search-box">
-            <input placeholder="Buscar" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Escape" && setQuery("")} />
-            {query ? (
-              <button className="icon-btn tiny" onClick={() => setQuery("")} aria-label="Limpar busca">
-                <Icons.X size={14} />
-              </button>
-            ) : (
-              <Icons.Search size={16} />
-            )}
-          </div>
+          {a.settings.ctxCollapsed && (
+            <button className="ibtn" data-tip="Mostrar painel" aria-label="Mostrar painel" onClick={() => a.toggleCtx()}>
+              <SidebarSimple size={19} weight="duotone" />
+            </button>
+          )}
         </header>
       )}
       {!compact && <ConnectionBanner s={s} peersOnline={peersOnline} />}
@@ -210,14 +209,32 @@ export function ChatView({ s, compact }: { s: Session; compact?: boolean }) {
   );
 }
 
+/** "Fulano está ao vivo · Assistir" no topo do chat. */
+function LiveCapsule({ s }: { s: Session }) {
+  const a = useApp();
+  const lives = [...(s.myLive ? [selfId] : []), ...Object.entries(s.peers).filter(([, p]) => p.live && s.isMember(p.pub)).map(([id]) => id)];
+  if (!lives.length) return null;
+  const first = lives[0];
+  const who = first === selfId ? "Você está" : `${s.peerName(first)} está`;
+  return (
+    <div className="livecap">
+      <span className="dot" />
+      <span className="ellipsis">
+        {who} ao vivo{lives.length > 1 ? ` (+${lives.length - 1})` : ""}
+      </span>
+      <button onClick={() => a.openLive(first)}>{first === selfId ? "Ver" : "Assistir"}</button>
+    </div>
+  );
+}
+
 function ChannelBell({ s, channelId }: { s: Session; channelId: string }) {
   const a = useApp();
   const key = s.server.sid + ":" + channelId;
   const muted = a.settings.mutedChannels.includes(key);
   return (
     <button
-      className="icon-btn"
-      title={muted ? "Reativar notificações do canal" : "Silenciar canal"}
+      className="ibtn"
+      data-tip={muted ? "Reativar notificações do canal" : "Silenciar canal"}
       onClick={() => a.setSettings({ ...a.settings, mutedChannels: muted ? a.settings.mutedChannels.filter((k) => k !== key) : [...a.settings.mutedChannels, key] })}
     >
       {muted ? <Icons.BellOff /> : <Icons.Bell />}
@@ -233,7 +250,7 @@ function ConnectionBanner({ s, peersOnline }: { s: Session; peersOnline: number 
     return (
       <div className="banner warn">
         🚪 {pending.length === 1 ? `${s.profileOf(pending[0][1].pub).name} está pedindo para entrar.` : `${pending.length} pessoas estão pedindo para entrar.`}
-        <button className="btn small" onClick={() => !a.showMembers && a.toggleMembers()}>
+        <button className="btn small" onClick={() => a.openCtx("members")}>
           Ver pedidos
         </button>
       </div>
@@ -356,47 +373,41 @@ function MessageRow({ s, m, grouped, names, editing, onEdit, onEditDone, onReply
     </>
   );
 
+  const hm = new Date(m.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const openProfile = () => a.openCtx("profile", m.author);
   return (
-    <div className={"msg" + (grouped ? " grouped" : "") + (mentionsMe ? " mentioned" : "") + (m.pending ? " pending" : "")} id={"msg-" + m.id} onContextMenu={menu}>
-      {replied && (
-        <div className="reply-ref" onClick={() => onJump(replied.id)}>
-          <span className="reply-spine" />
-          <Avatar name={s.profileOf(replied.author).name} color={s.profileOf(replied.author).color} src={s.profileOf(replied.author).avatar} size={16} />
-          <strong style={{ color: s.profileOf(replied.author).color }}>{s.profileOf(replied.author).name}</strong>
-          <span className="ellipsis dim">{replied.deleted ? "Mensagem apagada" : replied.text || "📎 Anexo"}</span>
-        </div>
-      )}
+    <div className={"msg" + (grouped ? " grouped" : "") + (mine ? " mine" : "") + (mentionsMe ? " mentioned" : "") + (m.pending ? " pending" : "")} id={"msg-" + m.id} onContextMenu={menu}>
       <div className="msg-row">
         {grouped ? (
-          <span className="msg-time-hover">{new Date(m.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+          <span className="msg-time-hover">{hm}</span>
         ) : (
-          <div className="msg-avatar" onClick={(e) => openMenu(e, memberMenu(s, m.author))}>
-            <Avatar name={author.name} color={author.color} src={author.avatar} size={40} />
-          </div>
+          <button className="msg-avatar" onClick={openProfile} onContextMenu={(e) => openMenu(e, memberMenu(s, m.author))} aria-label={`Perfil de ${author.name}`}>
+            <Avatar name={author.name} color={author.color} src={author.avatar} size={36} />
+          </button>
         )}
-        <div className="msg-body">
+        <div className="bubble msg-body">
           {!grouped && (
             <div className="msg-head">
-              <span className="msg-author" style={{ color: author.color }} onClick={(e) => openMenu(e, memberMenu(s, m.author))}>
+              <button className="msg-author" onClick={openProfile} onContextMenu={(e) => openMenu(e, memberMenu(s, m.author))}>
                 {author.name}
+              </button>
+              {role === "owner" && <span className="role-pill owner">dono</span>}
+              {role === "admin" && <span className="role-pill">admin</span>}
+              <span className="msg-time" title={timeLabel(m.ts)}>
+                {hm}
               </span>
-              {role === "owner" && (
-                <span className="role-icon owner" title="Dono do servidor">
-                  <Icons.Crown size={14} />
-                </span>
-              )}
-              {role === "admin" && (
-                <span className="role-icon admin" title="Administrador">
-                  <Icons.Shield size={14} />
-                </span>
-              )}
-              <span className="dim small">{timeLabel(m.ts)}</span>
               {m.pending && (
-                <span className="dim small" title="Ninguém online ainda — será entregue quando alguém entrar">
+                <span className="msg-time" title="Ninguém online ainda — será entregue quando alguém entrar">
                   · aguardando entrega
                 </span>
               )}
             </div>
+          )}
+          {replied && (
+            <button className="reply-ref" onClick={() => onJump(replied.id)}>
+              <strong>{s.profileOf(replied.author).name}</strong>
+              <span className="ellipsis">{replied.deleted ? "Mensagem apagada" : replied.text || "📎 Anexo"}</span>
+            </button>
           )}
           {body}
         </div>
@@ -667,8 +678,8 @@ function Composer({
         </div>
       )}
       <div className={"composer-box" + (replyTo || files.length ? " joined" : "")}>
-        <button className="icon-btn" title="Enviar arquivo" onClick={() => fileInput.current?.click()}>
-          <Icons.Plus />
+        <button className="ibtn" data-tip="Enviar arquivo" aria-label="Enviar arquivo" onClick={() => fileInput.current?.click()}>
+          <PlusCircle size={20} weight="duotone" />
         </button>
         <input
           ref={fileInput}
@@ -720,7 +731,7 @@ function Composer({
           }}
         />
         <div className="emoji-anchor">
-          <button className="icon-btn" title="Emoji" onClick={() => setEmoji(!emoji)}>
+          <button className="ibtn" data-tip="Emoji" aria-label="Emoji" onClick={() => setEmoji(!emoji)}>
             <Icons.Smile />
           </button>
           {emoji && (
@@ -734,6 +745,9 @@ function Composer({
             />
           )}
         </div>
+        <button className="send" data-tip="Enviar (Enter)" aria-label="Enviar" disabled={!text.trim() && !files.length} onClick={send}>
+          <PaperPlaneTilt size={19} weight="fill" />
+        </button>
       </div>
       {!compact && <div className="composer-hint dim">**negrito** *itálico* ~~riscado~~ `código` ||spoiler|| &gt; citação · Shift+Enter quebra linha · ↑ edita a última</div>}
     </div>

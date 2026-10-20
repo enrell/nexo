@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Nexo · Constelação</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root {
+    --violet: #a78bfa; --cyan: #22d3ee; --pink: #f472b6;
+    --grad: linear-gradient(135deg, var(--violet), var(--cyan));
+    --glass: rgba(255,255,255,.055); --glass-2: rgba(255,255,255,.09); --edge: rgba(255,255,255,.12);
+    --text: #eef0ff; --dim: #a6a9c9; --dimmer: #6f7398;
+  }
+  * { box-sizing: border-box }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { color: var(--text); font: 14.5px/1.5 Inter, system-ui, sans-serif;
+    background: radial-gradient(900px 600px at 15% 10%, rgba(124,58,237,.35), transparent 60%),
+                radial-gradient(800px 600px at 90% 90%, rgba(8,145,178,.30), transparent 60%),
+                radial-gradient(600px 400px at 60% 40%, rgba(244,114,182,.10), transparent 70%), #05060d; }
+  .stars, .stars2 { position: fixed; inset: 0; pointer-events: none;
+    background-image: radial-gradient(1px 1px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 70%, #fff, transparent), radial-gradient(1.5px 1.5px at 50% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 80%, #fff, transparent), radial-gradient(1px 1px at 90% 10%, #fff, transparent), radial-gradient(1.5px 1.5px at 80% 50%, #cfe, transparent), radial-gradient(1px 1px at 20% 90%, #fff, transparent), radial-gradient(1px 1px at 60% 60%, #fff, transparent);
+    background-size: 600px 600px; opacity: .5; animation: drift 120s linear infinite; }
+  .stars2 { background-size: 900px 900px; opacity: .3; animation-duration: 200s; }
+  @keyframes drift { to { background-position: 600px 300px; } }
+  h1, h2, h3, .sg { font-family: "Space Grotesk", Inter, sans-serif; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+  i.ph, i.ph-duotone, i.ph-fill { font-size: 19px; }
+
+  .glass { background: var(--glass); border: 1px solid var(--edge); backdrop-filter: blur(18px) saturate(140%); -webkit-backdrop-filter: blur(18px) saturate(140%); border-radius: 22px; }
+  .app { position: relative; height: 100%; display: grid; grid-template-columns: 64px 250px 1fr 320px; gap: 14px; padding: 14px; }
+
+  /* planetas */
+  .rail { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 14px 0; border-radius: 32px; }
+  .planet { width: 42px; height: 42px; border-radius: 50%; position: relative; display: grid; place-items: center; font: 700 13px "Space Grotesk"; cursor: pointer; transition: transform .2s; }
+  .planet:hover { transform: scale(1.08); }
+  .planet.on::before { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 1.5px solid transparent; background: var(--grad) border-box; -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: spin 6s linear infinite; }
+  .planet.on::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 10px var(--cyan); top: -7px; left: 50%; animation: orbit 6s linear infinite; transform-origin: 0 28px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes orbit { to { transform: rotate(360deg); } }
+  .planet .ping { position: absolute; right: -2px; top: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 8px var(--pink); }
+  .rail .sep { width: 24px; height: 1px; background: var(--edge); }
+  .rail .add { background: var(--glass-2); color: var(--dim); }
+  .rail .bottom { margin-top: auto; }
+
+  /* canais */
+  .side { padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+  .side .head { padding: 2px 8px 10px; }
+  .side .head h2 { margin: 0; font-size: 20px; background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .side .head small { color: var(--dimmer); }
+  .side h4 { margin: 14px 8px 4px; font: 600 11px Inter; letter-spacing: .1em; text-transform: uppercase; color: var(--dimmer); }
+  .side a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; color: var(--dim); text-decoration: none; position: relative; }
+  .side a:hover { background: var(--glass-2); color: var(--text); }
+  .side a.on { background: linear-gradient(90deg, rgba(167,139,250,.22), rgba(34,211,238,.08)); color: var(--text); }
+  .side a.on::before { content: ""; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 3px; background: var(--grad); box-shadow: 0 0 10px var(--violet); }
+  .side a .n { margin-left: auto; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; background: var(--pink); color: #1a0b14; }
+  .side a .orbs { margin-left: auto; display: flex; gap: 3px; }
+  .side a .orbs span { width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+  .side .me { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; background: var(--glass-2); }
+  .side .me .ctrl { margin-left: auto; display: flex; gap: 2px; }
+  .ibtn { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; color: var(--dim); }
+  .ibtn:hover { background: var(--glass-2); color: var(--text); }
+  .av { border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #0b0b18; flex: none; position: relative; }
+
+  /* chat */
+  .chat { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .chat header { padding: 14px 18px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--edge); }
+  .chat header h3 { margin: 0; font-size: 18px; }
+  .chat header small { color: var(--dimmer); }
+  .livecap { margin-left: auto; display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-radius: 999px; background: rgba(244,114,182,.12); border: 1px solid rgba(244,114,182,.35); font-size: 13px; }
+  .livecap .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--pink); box-shadow: 0 0 10px var(--pink); animation: pulse 1.4s infinite; }
+  .livecap button { background: var(--pink); color: #1a0b14; padding: 5px 12px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  .msgs { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; }
+  .sys { align-self: center; font-size: 12px; color: var(--dimmer); display: flex; align-items: center; gap: 8px; }
+  .sys::before, .sys::after { content: ""; width: 60px; height: 1px; background: linear-gradient(90deg, transparent, var(--edge)); }
+  .sys::after { transform: scaleX(-1); }
+  .card { display: flex; gap: 12px; max-width: 78%; }
+  .card .av { width: 36px; height: 36px; font-size: 14px; }
+  .bubble { background: var(--glass-2); border: 1px solid var(--edge); border-radius: 18px; border-top-left-radius: 6px; padding: 10px 14px; }
+  .bubble .who { display: flex; gap: 8px; align-items: baseline; font-size: 13px; margin-bottom: 3px; }
+  .bubble .who b { font-family: "Space Grotesk"; }
+  .bubble .who small { color: var(--dimmer); font-size: 11px; }
+  .card.mine { align-self: flex-end; flex-direction: row-reverse; }
+  .card.mine .bubble { border-radius: 18px; border-top-right-radius: 6px; border: 1px solid transparent; background: linear-gradient(rgba(20,16,40,.85), rgba(20,16,40,.85)) padding-box, var(--grad) border-box; }
+  .mention { color: var(--cyan); background: rgba(34,211,238,.12); padding: 0 4px; border-radius: 5px; }
+  .reacts { display: flex; gap: 6px; margin-top: 8px; }
+  .reacts span { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: rgba(255,255,255,.07); border: 1px solid var(--edge); }
+  .reacts span.mine { border-color: var(--violet); background: rgba(167,139,250,.18); }
+  .shot { margin-top: 8px; width: 260px; height: 146px; border-radius: 14px; background: radial-gradient(circle at 30% 40%, var(--pink), transparent 50%), radial-gradient(circle at 70% 70%, var(--cyan), transparent 50%), #1b1640; position: relative; overflow: hidden; }
+  .shot::after { content: "📸 clutch.png · 2,1 MB"; position: absolute; left: 10px; bottom: 8px; font-size: 11px; color: #fff; background: rgba(0,0,0,.4); padding: 2px 8px; border-radius: 6px; }
+  .quote { font-size: 12px; color: var(--dim); border-left: 2px solid var(--violet); padding-left: 8px; margin-bottom: 6px; }
+  .typing { padding: 0 22px 6px; font-size: 12px; color: var(--dimmer); }
+  .composer { margin: 0 16px 16px; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 18px; background: rgba(255,255,255,.06); border: 1px solid var(--edge); }
+  .composer input { flex: 1; border: 0; outline: none; background: none; color: var(--text); font: inherit; padding: 8px 4px; }
+  .composer input::placeholder { color: var(--dimmer); }
+  .send { width: 40px; height: 40px; border-radius: 14px; background: var(--grad); color: #0b0b18; display: grid; place-items: center; box-shadow: 0 6px 20px rgba(167,139,250,.35); }
+
+  /* órbita da voz */
+  .right { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .orbitbox { padding: 16px; }
+  .orbitbox h3, .livebox h3, .crew h3 { margin: 0 0 6px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .orbitbox small { color: var(--dimmer); }
+  .orbit { position: relative; height: 230px; margin-top: 18px; }
+  .ring { position: absolute; left: 50%; top: 50%; border-radius: 50%; border: 1px dashed rgba(255,255,255,.12); transform: translate(-50%,-50%); }
+  .core { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; transform: translate(-50%,-50%); border-radius: 50%; background: var(--grad); display: grid; place-items: center; color: #0b0b18; box-shadow: 0 0 40px rgba(34,211,238,.4); }
+  .bub { position: absolute; transform: translate(-50%,-50%); display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); }
+  .bub .av { width: 46px; height: 46px; font-size: 16px; }
+  .bub.talk .av { box-shadow: 0 0 0 3px rgba(167,139,250,.4), 0 0 24px var(--violet); animation: glow 1.1s ease-in-out infinite; }
+  @keyframes glow { 50% { box-shadow: 0 0 0 6px rgba(167,139,250,.15), 0 0 34px var(--violet); } }
+  .bub .mut { position: absolute; top: 30px; right: -4px; width: 20px; height: 20px; border-radius: 50%; background: #2a1030; display: grid; place-items: center; color: var(--pink); }
+  .bub .mut i { font-size: 12px; }
+  .vbar { display: flex; gap: 8px; margin-top: 8px; }
+  .vbar button { flex: 1; height: 38px; border-radius: 12px; background: var(--glass-2); display: grid; place-items: center; color: var(--text); }
+  .vbar button.hang { background: rgba(244,63,94,.2); color: #fb7185; }
+  .livebox { padding: 14px; }
+  .lthumb { position: relative; aspect-ratio: 16/9; border-radius: 14px; overflow: hidden; background: linear-gradient(160deg, #1e3a8a 0%, #7c3aed 55%, #f472b6 100%); }
+  .lthumb::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: #0b0b18; clip-path: polygon(0 70%, 20% 30%, 35% 60%, 55% 15%, 75% 55%, 100% 25%, 100% 100%, 0 100%); opacity: .85; }
+  .lthumb .tag { position: absolute; left: 10px; top: 10px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: var(--pink); color: #1a0b14; }
+  .lthumb .v { position: absolute; right: 10px; top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(0,0,0,.45); }
+  .lmeta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .lmeta small { color: var(--dimmer); }
+  .crew { padding: 14px; flex: 1; min-height: 0; overflow-y: auto; }
+  .row { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 12px; }
+  .row:hover { background: var(--glass-2); }
+  .row small { color: var(--dimmer); display: block; font-size: 12px; }
+  .row .st { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #14142a; }
+  .row .shield { margin-left: auto; color: var(--violet); font-size: 15px; }
+</style>
+</head>
+<body>
+  <div class="stars"></div><div class="stars2"></div>
+  <div class="app">
+    <nav class="rail glass">
+      <div class="planet on" style="background:radial-gradient(circle at 30% 30%, #c4b5fd, #6d28d9)" title="Os Brabos">OB</div>
+      <div class="planet" style="background:radial-gradient(circle at 30% 30%, #67e8f9, #0e7490)" title="Faculdade">FA<span class="ping"></span></div>
+      <div class="planet" style="background:radial-gradient(circle at 30% 30%, #f9a8d4, #be185d)" title="Família">FM</div>
+      <div class="sep"></div>
+      <div class="planet add" title="Novo servidor"><i class="ph ph-plus"></i></div>
+      <div class="planet add" title="Explorar convite"><i class="ph ph-compass"></i></div>
+      <div class="planet add bottom" title="Amigos e conversas"><i class="ph-duotone ph-chats-circle"></i></div>
+    </nav>
+
+    <aside class="side glass">
+      <div class="head"><h2>Os Brabos</h2><small>6 online · cifrado ponta a ponta</small></div>
+      <h4>Canais</h4>
+      <a class="on" href="#"><i class="ph ph-hash"></i>geral</a>
+      <a href="#"><i class="ph ph-hash"></i>clips-e-links<span class="n">4</span></a>
+      <a href="#"><i class="ph ph-hash"></i>memes</a>
+      <a href="#"><i class="ph-duotone ph-lock-key"></i>admins</a>
+      <h4>Voz</h4>
+      <a href="#"><i class="ph-duotone ph-planet"></i>Sala principal<span class="orbs"><span style="color:#a78bfa;background:#a78bfa"></span><span style="color:#22d3ee;background:#22d3ee"></span><span style="color:#f472b6;background:#f472b6"></span></span></a>
+      <a href="#"><i class="ph-duotone ph-game-controller"></i>Jogando</a>
+      <h4>Ao vivo</h4>
+      <a href="#"><i class="ph-fill ph-broadcast" style="color:var(--pink)"></i>Rafa · Ranqueada</a>
+      <div class="me">
+        <div class="av" style="width:34px;height:34px;background:#22d3ee">E</div>
+        <div><b class="sg">enrell</b><br /><small style="color:var(--dimmer)">na voz · 32 ms</small></div>
+        <div class="ctrl"><button class="ibtn"><i class="ph-duotone ph-microphone"></i></button><button class="ibtn"><i class="ph-duotone ph-gear-six"></i></button></div>
+      </div>
+    </aside>
+
+    <main class="chat glass">
+      <header>
+        <i class="ph ph-hash" style="font-size:22px;color:var(--violet)"></i>
+        <div><h3>geral</h3><small>conversa principal da galera</small></div>
+        <div class="livecap"><span class="dot"></span>Rafa está ao vivo<button>Assistir</button></div>
+        <button class="ibtn"><i class="ph ph-push-pin"></i></button><button class="ibtn"><i class="ph ph-magnifying-glass"></i></button>
+      </header>
+      <div class="msgs">
+        <div class="sys">hoje</div>
+        <div class="card"><div class="av" style="background:#a78bfa">R</div><div class="bubble"><div class="who"><b>Rafa</b><small>21:03</small></div>salve galera, <b>hoje tem live</b> às 21h 🎮</div></div>
+        <div class="card"><div class="av" style="background:#f472b6">M</div><div class="bubble"><div class="who"><b>Mari</b><small>21:04</small></div>olha esse clutch de ontem<div class="shot"></div><div class="reacts"><span class="mine">🔥 3</span><span>😂 1</span></div></div></div>
+        <div class="card"><div class="av" style="background:#a78bfa">R</div><div class="bubble"><div class="who"><b>Rafa</b><small>21:06</small></div><span class="mention">@enrell</span> abre a sala de voz ae</div></div>
+        <div class="card mine"><div class="av" style="background:#22d3ee">E</div><div class="bubble"><div class="quote">Rafa: @enrell abre a sala de voz ae</div>já abri, entra lá ✨<div class="who" style="justify-content:flex-end;margin:4px 0 0"><small>21:06 · entregue</small></div></div></div>
+        <div class="sys">Lu entrou no servidor</div>
+      </div>
+      <div class="typing">Mari está digitando…</div>
+      <div class="composer"><button class="ibtn"><i class="ph ph-paperclip"></i></button><input placeholder="Mensagem para #geral" /><button class="ibtn"><i class="ph ph-smiley-wink"></i></button><button class="send"><i class="ph-fill ph-paper-plane-tilt"></i></button></div>
+    </main>
+
+    <aside class="right">
+      <div class="glass orbitbox">
+        <h3><i class="ph-duotone ph-planet" style="color:var(--cyan)"></i> Sala principal</h3>
+        <small>3 em órbita · você está aqui</small>
+        <div class="orbit">
+          <div class="ring" style="width:200px;height:200px"></div>
+          <div class="ring" style="width:130px;height:130px"></div>
+          <div class="core"><i class="ph-fill ph-waveform" style="font-size:24px"></i></div>
+          <div class="bub talk" style="left:50%;top:10%"><div class="av" style="background:#a78bfa">R</div>Rafa</div>
+          <div class="bub" style="left:16%;top:76%"><div class="av" style="background:#22d3ee">E</div>você</div>
+          <div class="bub" style="left:84%;top:76%"><div class="av" style="background:#f472b6">M</div><span class="mut"><i class="ph-fill ph-microphone-slash"></i></span>Mari</div>
+        </div>
+        <div class="vbar"><button><i class="ph-duotone ph-microphone"></i></button><button><i class="ph-duotone ph-headphones"></i></button><button><i class="ph-duotone ph-screencast"></i></button><button class="hang"><i class="ph-fill ph-phone-x"></i></button></div>
+      </div>
+      <div class="glass livebox">
+        <h3><i class="ph-fill ph-broadcast" style="color:var(--pink)"></i> Ao vivo</h3>
+        <div class="lthumb"><span class="tag">AO VIVO</span><span class="v">👁 3 · 1080p60</span></div>
+        <div class="lmeta"><div class="av" style="width:30px;height:30px;font-size:12px;background:#a78bfa">R</div><div><b class="sg">Rafa</b><br /><small>Ranqueada · há 24 min</small></div></div>
+      </div>
+      <div class="glass crew">
+        <h3><i class="ph-duotone ph-users-three"></i> Tripulação</h3>
+        <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:#22d3ee">E<span class="st" style="background:#34d399"></span></div><div>enrell<small>dono</small></div><i class="ph-fill ph-crown shield" style="color:#fbbf24"></i></div>
+        <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:#a78bfa">R<span class="st" style="background:#34d399"></span></div><div>Rafa<small>transmitindo</small></div><i class="ph-fill ph-shield-star shield"></i></div>
+        <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:#f472b6">M<span class="st" style="background:#34d399"></span></div><div>Mari<small>na voz</small></div></div>
+        <div class="row"><div class="av" style="width:32px;height:32px;font-size:12px;background:#fbbf24">L<span class="st" style="background:#fbbf24"></span></div><div>Lu<small>ausente</small></div></div>
+      </div>
+    </aside>
+  </div>
+  <script src="nav.js"></script>
+</body>
+</html>

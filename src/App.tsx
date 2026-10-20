@@ -1,16 +1,20 @@
+import { ChatsTeardrop, Plus } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/space-grotesk";
 import "./App.css";
 import { resetLocalData, useApp } from "./lib/app";
 import type { Session } from "./lib/session";
 import { ChatView } from "./components/Chat";
 import { ContextMenuHost } from "./components/ContextMenu";
+import { ContextPanel } from "./components/ContextPanel";
 import { LightboxHost } from "./components/Lightbox";
 import { LiveView } from "./components/Live";
-import { Members } from "./components/Members";
-import { AddServerModal, GoLiveModal, Home, InviteModal, Onboarding, PromptModal, QuickSwitcher, Splash } from "./components/Modals";
+import { AddServerModal, GoLiveModal, Home, InviteModal, Onboarding, PromptModal, Splash } from "./components/Modals";
 import { ServerSettingsScreen, SettingsScreen } from "./components/Settings";
 import { SafetyHost } from "./components/Safety";
-import { ServerRail, Sidebar, type OpenModal } from "./components/Sidebar";
+import { FindPanel, TipLayer, Worlds, YouPanel, type OpenModal } from "./components/Shell";
+import { ServerColumn } from "./components/Sidebar";
 
 type ModalKind = Parameters<OpenModal>[0] | null;
 
@@ -21,15 +25,17 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setModal((m) => (m === "switcher" ? null : "switcher"));
-      }
-      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
         const i = a.servers.findIndex((s) => s.roomId === a.activeRoom);
-        const next = a.servers[(i + (e.key === "ArrowDown" ? 1 : a.servers.length - 1)) % a.servers.length];
+        const fwd = e.key === "ArrowDown" || e.key === "ArrowRight";
+        const next = a.servers[(i + (fwd ? 1 : a.servers.length - 1) + a.servers.length) % a.servers.length];
         if (next) a.selectServer(next.roomId);
+      }
+      // Esc volta o painel da direita (quando nada mais está aberto)
+      if (e.key === "Escape" && !e.defaultPrevented && a.ctx.view !== "home" && !document.querySelector(".modal-backdrop, .fullscreen-settings, .lightbox, .menu.ctx")) {
+        const t = e.target as HTMLElement;
+        if (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") a.ctxBack();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -41,26 +47,24 @@ export default function App() {
   if (!a.profile) return <Onboarding />;
   const s = a.session;
   const theater = a.theater && a.view.type === "live";
+  const collapsed = a.settings.ctxCollapsed;
 
   return (
-    <div className={"app" + (theater ? " theater" : "")}>
-      {!theater && <ServerRail open={setModal} />}
-      {s ? (
-        <>
-          {!theater && <Sidebar s={s} open={setModal} />}
-          <main className="main">{!s.isMember() ? <Waiting s={s} /> : a.view.type === "live" ? <LiveView s={s} origin={a.view.origin} /> : <ChatView s={s} />}</main>
-          {a.view.type === "chat" && a.showMembers && s.isMember() && <Members s={s} />}
-        </>
-      ) : (
-        <Home onAdd={() => setModal("add")} />
-      )}
+    <div className={"app" + (theater ? " theater" : "") + (collapsed ? " ctx-collapsed" : "")}>
+      <div className="stars" aria-hidden />
+      {!theater && <YouPanel open={setModal} />}
+      {!theater && <Worlds open={setModal} />}
+      {!theater && <FindPanel />}
+      {!theater && (s ? <ServerColumn s={s} open={setModal} /> : <HomeColumn onAdd={() => setModal("add")} />)}
+      <main className="main panel">{s ? !s.isMember() ? <Waiting s={s} /> : a.view.type === "live" ? <LiveView s={s} origin={a.view.origin} /> : <ChatView s={s} /> : <Home onAdd={() => setModal("add")} />}</main>
+      {!theater && !collapsed && <ContextPanel open={setModal} />}
 
       {modal === "add" && <AddServerModal onClose={close} />}
       {modal === "invite" && s && <InviteModal s={s} onClose={close} />}
       {modal === "settings" && <SettingsScreen onClose={close} />}
       {modal === "server-settings" && s && <ServerSettingsScreen s={s} onClose={close} />}
       {modal === "golive" && s && <GoLiveModal s={s} onClose={close} />}
-      {modal === "switcher" && <QuickSwitcher onClose={close} />}
+      {modal === "golive-camera" && s && <GoLiveModal s={s} onClose={close} initialKind="camera" />}
       {modal === "channel" && s && (
         <PromptModal
           title="Criar canal de texto"
@@ -76,6 +80,7 @@ export default function App() {
       <ContextMenuHost />
       <LightboxHost />
       <SafetyHost />
+      <TipLayer />
       {a.update?.status === "ready" && (
         <div className="update-bar">
           Nova versão {a.update.version} pronta.
@@ -90,6 +95,32 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+/** Coluna esquerda quando nenhum servidor está aberto (planeta Início). */
+function HomeColumn({ onAdd }: { onAdd: () => void }) {
+  return (
+    <aside className="side panel">
+      <div className="srv-head">
+        <div className="srv-btn static">
+          <span className="emb">
+            <ChatsTeardrop size={18} weight="duotone" />
+          </span>
+          <span className="srv-txt">
+            <b>Início</b>
+            <small>fora dos servidores</small>
+          </span>
+        </div>
+      </div>
+      <div className="side-scroll">
+        <p className="side-hint">Amigos e conversas diretas (sem servidor) chegam na próxima versão.</p>
+        <button className="chan" onClick={onAdd}>
+          <Plus size={17} weight="bold" />
+          <span>Criar ou entrar em servidor</span>
+        </button>
+      </div>
+    </aside>
   );
 }
 
