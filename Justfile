@@ -54,6 +54,10 @@ mutation filtro="":
 e2e:
     npm run test:e2e
 
+# e2e no Windows a partir do WSL (aqui o Electron não abre); baixa Node e Electron portáteis para %TEMP% na 1ª vez
+e2e-win: build
+    scripts/e2e-win.sh
+
 # tudo o que o CI confere, na ordem dele
 check: typecheck build coverage
     npm audit --omit=dev --audit-level=high

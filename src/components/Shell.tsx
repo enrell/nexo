@@ -225,13 +225,21 @@ export function FindPanel() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        input.current?.focus();
-        input.current?.select();
+        const el = input.current;
+        if (!el) return;
+        // janela estreita: o campo só aparece com a gaveta da busca aberta; abre e foca depois de desenhar
+        if (el.getClientRects().length === 0) {
+          a.openCtx("search");
+          // espera a gaveta ser desenhada (até ~0,5 s) antes de focar
+          let tries = 0;
+          const focusWhenShown = () => (el.getClientRects().length ? (el.focus(), el.select()) : ++tries < 30 && requestAnimationFrame(focusWhenShown));
+          requestAnimationFrame(focusWhenShown);
+        } else (el.focus(), el.select());
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [a]);
 
   const results = a.ctx.view === "search" ? searchResults(a) : [];
   return (

@@ -844,8 +844,24 @@ export class Session {
     if (!stream || !stream.getTracks().includes(old)) return;
     if (this.liveRestarts++ >= 3) return this.stopLive();
     try {
-      await new Promise((r) => setTimeout(r, 300));
-      const fresh = (await navigator.mediaDevices.getUserMedia({ video })).getVideoTracks()[0];
+      // o dispositivo pode demorar a voltar (USB reconectando, driver reiniciando): tenta com espera
+      // crescente e, se a câmera escolhida sumiu de vez, aceita qualquer câmera
+      let fresh: MediaStreamTrack | undefined;
+      // (o serviço de captura do Chromium, se cai, leva alguns segundos para voltar)
+      const waits = [300, 1000, 2500, 5000];
+      for (const [i, wait] of waits.entries()) {
+        await new Promise((r) => setTimeout(r, wait));
+        if (this.myStream !== stream) return;
+        const last = i === waits.length - 1;
+        const want = i >= 2 ? { ...video, deviceId: undefined } : video;
+        try {
+          fresh = (await navigator.mediaDevices.getUserMedia({ video: want })).getVideoTracks()[0];
+          break;
+        } catch (e) {
+          if (last) throw e;
+        }
+      }
+      if (!fresh) throw new Error("sem trilha de vídeo");
       if (this.myStream !== stream) return fresh.stop();
       fresh.contentHint = old.contentHint;
       fresh.onended = () => this.recoverCamera(fresh, video);

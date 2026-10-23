@@ -50,7 +50,7 @@ export default function App() {
   const collapsed = a.settings.ctxCollapsed;
 
   return (
-    <div className={"app" + (theater ? " theater" : "") + (collapsed ? " ctx-collapsed" : "") + (a.ctxDrawer ? " ctx-open" : "")}>
+    <div className={"app" + (theater ? " theater" : "") + (collapsed ? " ctx-collapsed" : "") + (a.ctxDrawer ? " ctx-open" : "") + (a.ctx.view === "search" ? " ctx-search" : "")}>
       {!theater && <YouPanel open={setModal} />}
       {!theater && <Worlds open={setModal} />}
       {!theater && <FindPanel />}

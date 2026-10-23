@@ -108,6 +108,9 @@ kbd { font: 11px var(--font); padding: 1px 6px; border-radius: 5px; background: 
 @media (max-width: 1060px) {
   .app.ctx-open:not(.theater) > .ctx { display: flex; position: fixed; top: 0; right: 0; bottom: 0; width: min(340px, 92vw); z-index: 80; background: var(--rail); border-left: 1px solid var(--edge); box-shadow: -12px 0 32px rgb(0 0 0 / 0.35); }
   .narrow-only { display: inline-flex; }
+  /* busca (Ctrl+K): o campo do topo vem junto, em cima da gaveta */
+  .app.ctx-open.ctx-search:not(.theater) > .find { display: flex; position: fixed; top: 0; right: 0; width: min(340px, 92vw); height: var(--top); z-index: 81; background: var(--rail); border-left: 1px solid var(--edge); }
+  .app.ctx-open.ctx-search:not(.theater) > .ctx { top: var(--top); }
   .app.ctx-open:not(.theater) > .ctx-scrim { display: block; position: fixed; inset: 0; z-index: 79; background: rgb(0 0 0 / 0.35); }
 }
 

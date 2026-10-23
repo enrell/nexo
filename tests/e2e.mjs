@@ -14,7 +14,8 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // diretório temporário exclusivo e imprevisível
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "nexo-e2e-"));
-const exe = path.join(root, "node_modules/electron/dist", process.platform === "win32" ? "electron.exe" : "electron");
+// NEXO_E2E_ELECTRON: outro binário do Electron (ex.: o do Windows, quando o repositório está no WSL; veja scripts/e2e-win.sh)
+const exe = process.env.NEXO_E2E_ELECTRON || path.join(root, "node_modules/electron/dist", process.platform === "win32" ? "electron.exe" : "electron");
 
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1).padStart(5)}s]`, ...a);
@@ -32,6 +33,16 @@ async function step(name, fn) {
     fs.mkdirSync(shots, { recursive: true });
     for (const P of Object.values(apps)) await P.page.screenshot({ path: path.join(shots, `falha-${P.name}.png`) }).catch(() => {});
     log("   screenshots em", shots);
+    // estado de cada instância no momento da falha (live, voz, peers), para não depender só da imagem
+    for (const P of Object.values(apps)) {
+      const st = await P.ev(() => {
+        const s = window.__nexo?.session;
+        return s && { view: window.__nexo.view, myLive: !!s.myLive, inVoice: s.inVoice, peers: Object.values(s.peers).map((p) => `${p.profile?.name}${p.live ? "(live)" : ""}${p.inVoice ? "(voz)" : ""}`) };
+      }).catch((e) => "indisponível: " + e.message);
+      log("   ", P.name, JSON.stringify(st));
+      const g = await P.appl.evaluate(() => globalThis.__gone ?? []).catch(() => []);
+      if (g.length) log("   ", P.name, "processos que caíram:", g.join("; "));
+    }
     log("✘", name, "—", e.message.split("\n").slice(0, 6).join("\n      "));
     throw e;
   }
@@ -45,8 +56,12 @@ async function launch(name, { fresh = true } = {}) {
     cwd: root,
   });
   const page = await appl.firstWindow();
+  // processos filhos do Electron que morrem (GPU, captura de vídeo...): aparecem no log se uma etapa falhar
+  await appl.evaluate(({ app }) => app.on("child-process-gone", (_e, d) => (globalThis.__gone ??= []).push(`${d.type}${d.name ? ":" + d.name : ""} ${d.reason} (${d.exitCode})`)));
+  // NEXO_E2E_WIDTH: força a largura da janela (ex.: 1000 para testar o layout estreito, como no runner do CI)
+  if (process.env.NEXO_E2E_WIDTH) await appl.evaluate(({ BrowserWindow }, w) => BrowserWindow.getAllWindows()[0].setSize(w, 760), Number(process.env.NEXO_E2E_WIDTH));
   page.on("pageerror", (e) => log(name, "pageerror:", e.message));
-  page.on("console", (m) => m.type() === "error" && !/WebSocket|relay|ERR_/.test(m.text()) && log(name, "console:", m.text().slice(0, 200)));
+  page.on("console", (m) => (m.type() === "error" || (m.type() === "warning" && /live|câmera|camera|transmiss/i.test(m.text()))) && !/WebSocket|relay|ERR_/.test(m.text()) && log(name, "console:", m.text().slice(0, 200)));
   await page.waitForFunction(() => window.__nexo?.ready, null, { timeout: 20000 });
   if (fresh) {
     await page.getByRole("button", { name: "Pular" }).click();
@@ -320,7 +335,8 @@ try {
     await A.page.getByText("Modo de entrada").waitFor();
     await A.page.keyboard.press("Escape");
     await A.page.keyboard.press("Control+k");
-    const focused = await A.ev(() => document.activeElement?.closest(".search") !== null);
+    // em janela estreita a busca abre numa gaveta e o foco vem depois de ela ser desenhada
+    const focused = await wait(A, () => document.activeElement?.closest(".search") !== null, null, 2000).then(() => true, () => false);
     if (!focused) throw new Error("Ctrl+K não focou a busca");
     await A.page.keyboard.type("geral");
     await A.page.locator(".ctx .res", { hasText: "#geral" }).waitFor();
