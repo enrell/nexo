@@ -57,7 +57,16 @@ jobs:
         # depende de relays públicos; uma nova tentativa evita falso negativo por rede
         env:
           DEBUG: pw:browser
+          E2E_SHOTS: ${{ runner.temp }}/e2e-shots
         run: node tests/e2e.mjs || node tests/e2e.mjs
+      - name: Screenshots do teste ponta a ponta (se falhou)
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-falha-${{ github.sha }}
+          path: ${{ runner.temp }}/e2e-shots
+          retention-days: 7
+          if-no-files-found: ignore
       - name: Instalador (sem publicar)
         run: npx electron-builder --win --publish never
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

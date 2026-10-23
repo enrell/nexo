@@ -27,9 +27,12 @@ async function step(name, fn) {
     log("✔", name, `(${((Date.now() - s) / 1000).toFixed(1)}s)`);
   } catch (e) {
     results.push([name, false, e.message]);
-    for (const P of Object.values(apps)) await P.page.screenshot({ path: path.join(tmp, `falha-${P.name}.png`) }).catch(() => {});
-    log("   screenshots em", tmp);
-    log("✘", name, "—", e.message.split("\n")[0]);
+    // no CI os screenshots vão para uma pasta que o workflow anexa ao run
+    const shots = process.env.E2E_SHOTS || tmp;
+    fs.mkdirSync(shots, { recursive: true });
+    for (const P of Object.values(apps)) await P.page.screenshot({ path: path.join(shots, `falha-${P.name}.png`) }).catch(() => {});
+    log("   screenshots em", shots);
+    log("✘", name, "—", e.message.split("\n").slice(0, 6).join("\n      "));
     throw e;
   }
 }
