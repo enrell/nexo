@@ -14,17 +14,15 @@
 import { joinRoom, selfId, type DataPayload, type Room } from "trystero";
 import { db } from "./db";
 import { derive, dayKey, isMemberOf, summarize, type Derived } from "./derive";
+import { canonical, GOVERNANCE, MAX_FUTURE_MS, validateBody, verifyEvent } from "./events";
 import { isPubKey, sha256, verify, type Identity } from "./identity";
+import { sanitizeLive, sanitizePatch, sanitizeProfile, sanitizeThumb, type PresencePatch } from "./sanitize";
 import { makePeerConnectionClass, myFingerprint, remoteFingerprint } from "./rtc";
 import { randomId } from "./storage";
 import type { Attachment, EventBody, LiveInfo, Member, MsgView, PeerInfo, Profile, ServerInfo, Settings, SignedEvent, StoredEvent, WatchState } from "./types";
 
 export const APP_ID = "nexo-p2p-v3";
 export const PROTO = 3;
-/** maior evento aceito (JSON); mensagens têm até 4000 caracteres */
-const MAX_EVENT_BYTES = 24 * 1024;
-const GOVERNANCE = new Set(["role", "ban", "chan", "name", "move", "admit", "policy"]);
-const KINDS = new Set(["msg", "edit", "del", "react", ...GOVERNANCE]);
 
 /** Limite simples por peer (token bucket) contra inundação. */
 class Bucket {
@@ -65,7 +63,6 @@ export type SessionCtx = {
 };
 
 type Hello = { profile: Profile; live: LiveInfo | null; inVoice: boolean; muted: boolean; deaf: boolean; thumb?: string };
-type StatePatch = Partial<Pick<PeerInfo, "live" | "inVoice" | "muted" | "deaf" | "profile" | "thumb">>;
 type WatchReply = { ok: true } | { ok: false; reason: string } | { redirect: string };
 type MediaMeta = { kind: "live" | "voice"; origin?: string };
 export type LiveStats = { res: string; fps: number; kbps: number; codec: string; loss: number };
@@ -79,8 +76,6 @@ export const QUALITY: Record<Settings["quality"], { width: number; height: numbe
   "1440p60": { width: 2560, height: 1440, fps: 60 },
 };
 
-const canonical = (a: string, ts: number, b: EventBody) => JSON.stringify([a, ts, b]);
-
 export class Session {
   room: Room;
   peers: Record<string, PeerInfo> = {};
@@ -88,7 +83,8 @@ export class Session {
   members: Record<string, Member> = {};
   loaded = false;
   joinError: string | null = null;
-  typing: Record<string, Record<string, number>> = {}; // canal -> pub -> expira
+  // canal -> pub -> expira. Sem protótipo: o nome do canal vem da rede e "constructor" não pode ser um canal
+  typing: Record<string, Record<string, number>> = Object.create(null);
   blobsLoading = new Set<string>();
   private derivedCache: Derived | null = null;
   private moving = false;
@@ -163,7 +159,7 @@ export class Session {
     this.act.hello.onMessage = (h: Hello, { peerId }) => {
       if (this.allow(peerId, "small", false)) void this.onHello(peerId, h);
     };
-    this.act.state.onMessage = (p: StatePatch, { peerId }) => {
+    this.act.state.onMessage = (p: unknown, { peerId }) => {
       if (this.allow(peerId, "small", false)) void this.onState(peerId, p);
     };
     this.act.ev.onMessage = (evs: SignedEvent[], { peerId }) => {
@@ -238,7 +234,8 @@ export class Session {
 
   private async load() {
     const [evs, mems] = await Promise.all([db.loadEvents(this.server.sid), db.loadMembers(this.server.sid)]);
-    for (const e of evs) this.events.set(e.id, e);
+    // eventos guardados por versões que ainda não validavam o conteúdo não podem derrubar a interface
+    for (const e of evs) if (validateBody(e.b)) this.events.set(e.id, e);
     for (const m of mems) this.members[m.pub] = m;
     this.loaded = true;
     this.invalidate();
@@ -397,11 +394,11 @@ export class Session {
   private onHello(peerId: string, h: Hello) {
     const p = this.peers[peerId];
     if (!p || !h?.profile) return;
-    p.profile = sanitizeProfile({ ...h.profile, userId: p.pub }); // vale a chave provada no handshake
+    p.profile = sanitizeProfile(h.profile, p.pub); // vale a chave provada no handshake
     this.rememberMember(p.pub, p.profile);
     if (this.isMember(p.pub) || !this.isMember()) {
-      p.live = h.live && typeof h.live === "object" ? h.live : null;
-      p.thumb = typeof h.thumb === "string" && h.thumb.startsWith("data:image/jpeg;base64,") && h.thumb.length < 80_000 ? h.thumb : undefined;
+      p.live = sanitizeLive(h.live);
+      p.thumb = sanitizeThumb(h.thumb);
       p.muted = !!h.muted;
       p.deaf = !!h.deaf;
       const wasVoice = p.inVoice;
@@ -442,14 +439,12 @@ export class Session {
     this.ctx.emit();
   }
 
-  private onState(id: string, patch: StatePatch) {
+  private onState(id: string, raw: unknown) {
     const prev = this.peers[id];
-    if (!prev || !patch || typeof patch !== "object") return;
-    if (this.isMember() && !this.isMember(prev.pub)) patch = patch.profile ? { profile: patch.profile } : {};
-    if (patch.profile) {
-      patch.profile = sanitizeProfile({ ...patch.profile, userId: prev.pub });
-      this.rememberMember(prev.pub, patch.profile);
-    }
+    if (!prev || !raw || typeof raw !== "object") return;
+    // só chaves conhecidas e validadas; quem ainda não é membro só atualiza nome e foto
+    const patch = sanitizePatch(raw, prev.pub, this.isMember() && !this.isMember(prev.pub));
+    if (patch.profile) this.rememberMember(prev.pub, patch.profile);
     const wasVoice = prev.inVoice;
     const wasLive = !!prev.live;
     Object.assign(prev, patch);
@@ -476,7 +471,7 @@ export class Session {
     this.ctx.emit();
   }
 
-  broadcastState(p: StatePatch) {
+  broadcastState(p: PresencePatch) {
     this.toMembers((target) => this.act.state.send(p, { target }));
   }
 
@@ -549,7 +544,7 @@ export class Session {
     const a = this.me;
     // relógio lógico: sempre depois de tudo que já vimos (mesmo com o relógio do PC atrasado)
     let ts = Date.now();
-    for (const e of this.events.values()) if (e.ts >= ts && e.ts < Date.now() + 5 * 60_000) ts = e.ts + 1;
+    for (const e of this.events.values()) if (e.ts >= ts && e.ts < Date.now() + MAX_FUTURE_MS) ts = e.ts + 1;
     const data = canonical(a, ts, b);
     const ev: StoredEvent = { id: await sha256(data), a, ts, b, s: await this.ctx.identity.sign(data), srv: this.server.sid };
     const online = this.memberPeers().length > 0;
@@ -572,14 +567,11 @@ export class Session {
     // em ordem de tempo: um "torna admin" vem antes das ações desse admin
     const batch = evs.slice(0, 1000).filter((e) => e && typeof e === "object" && Number.isSafeInteger(e.ts)).sort((x, y) => x.ts - y.ts);
     const batchAdmins = new Set<string>();
-    for (const e of batch) {
-      if (typeof e.id !== "string" || this.events.has(e.id) || this.quarantine.has(e.id) || !e.b || typeof e.b !== "object") continue;
-      if (e.ts > Date.now() + 5 * 60_000 || !isPubKey(e.a) || !KINDS.has(e.b.k)) continue;
-      const data = canonical(e.a, e.ts, e.b);
-      if (data.length > MAX_EVENT_BYTES) continue;
-      if (banned.has(e.a)) continue; // de quem já está banido, nada
-      if ((await sha256(data)) !== e.id) continue;
-      if (!(await verify(e.a, data, e.s))) continue;
+    for (const raw of batch) {
+      if (typeof raw.id !== "string" || this.events.has(raw.id) || this.quarantine.has(raw.id)) continue;
+      if (banned.has(raw.a)) continue; // de quem já está banido, nada (antes de gastar hash e assinatura)
+      const e = await verifyEvent(raw);
+      if (!e) continue;
       const ev: StoredEvent = { id: e.id, a: e.a, ts: e.ts, b: e.b, s: e.s, srv: this.server.sid };
       // quem não é admin agora não pode "voltar no tempo" e publicar moderação com data antiga
       // (ex.: ex-admin forjando um ban). Fica em quarentena até ele virar admin para nós.
@@ -695,7 +687,7 @@ export class Session {
   private onTyping(peerId: string, ch: string) {
     const pub = this.peers[peerId]?.pub;
     if (!pub || typeof ch !== "string") return;
-    (this.typing[ch] ??= {})[pub] = Date.now() + 5000;
+    (this.typing[ch] ??= Object.create(null))[pub] = Date.now() + 5000;
     this.ctx.emit();
   }
   typingIn(ch: string) {
@@ -1196,15 +1188,4 @@ const cleanChannel = (name: string) =>
 
 function stripLocal(e: StoredEvent): SignedEvent {
   return { id: e.id, a: e.a, ts: e.ts, b: e.b, s: e.s };
-}
-
-function sanitizeProfile(p: Profile): Profile {
-  return {
-    userId: String(p.userId),
-    name: String(p.name ?? "?").slice(0, 32) || "?",
-    color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : "#80848e",
-    avatar: typeof p.avatar === "string" && p.avatar.startsWith("data:image/") && p.avatar.length < 60_000 ? p.avatar : undefined,
-    status: p.status === "idle" || p.status === "dnd" ? p.status : "online",
-    relaySlots: Math.max(0, Math.min(8, Number(p.relaySlots) || 0)),
-  };
 }

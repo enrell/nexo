@@ -14,7 +14,7 @@ export function ThemeEditor() {
 
   return (
     <div className="theme-editor">
-      <p className="ctx-note">Cores sólidas com transparência, sem desfoque: qualquer fundo combina.</p>
+      <p className="ctx-note">Uma cor de destaque sobre um tom base. As superfícies se ajustam ao fundo escolhido.</p>
 
       <section className="sec">
         <h5>Cores de destaque</h5>
@@ -23,7 +23,7 @@ export function ThemeEditor() {
             <button
               key={ac.id}
               className={"swatch" + (st.themeAccent === ac.id ? " on" : "")}
-              style={{ background: `linear-gradient(135deg, ${ac.a1}, ${ac.a2})` }}
+              style={{ background: ac.a1 }}
               data-tip={ac.name}
               aria-label={ac.name}
               onClick={() => set({ themeAccent: ac.id })}
@@ -36,7 +36,7 @@ export function ThemeEditor() {
         <h5>Fundo</h5>
         <div className="bgs">
           {BACKGROUNDS.map((bg) => (
-            <button key={bg.id} className={"bg-opt" + (st.themeBg === bg.id ? " on" : "")} style={{ background: bg.css }} onClick={() => set({ themeBg: bg.id })}>
+            <button key={bg.id} className={"bg-opt" + (st.themeBg === bg.id ? " on" : "")} style={{ background: bg.base }} onClick={() => set({ themeBg: bg.id })}>
               <span>{bg.name}</span>
             </button>
           ))}
@@ -83,9 +83,9 @@ export function ThemeEditor() {
         <div className="seg">
           {(
             [
-              [8, "retos"],
-              [18, "redondos"],
-              [26, "bem redondos"],
+              [4, "retos"],
+              [10, "suaves"],
+              [16, "redondos"],
             ] as const
           ).map(([v, l]) => (
             <button key={v} className={st.radius === v ? "on" : ""} onClick={() => set({ radius: v })}>

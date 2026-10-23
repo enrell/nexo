@@ -1,7 +1,7 @@
 import { Fragment, useState, type ReactNode } from "react";
 
 const INLINE =
-  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\|\|[^|\n]+\|\|)|(~~[^~\n]+~~)|(\*[^*\s][^*\n]*\*)|(\b_[^_\s][^_\n]*_\b)|(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])|(@[\p{L}\p{N}_.-]+)/gu;
+  /(`[^`\n]+`)|(\*\*[^\n]+?\*\*(?!\*))|(\|\|[^|\n]+\|\|)|(~~[^~\n]+~~)|(\*[^*\s][^*\n]*\*)|(\b_[^_\s][^_\n]*_\b)|(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"])|(@[\p{L}\p{N}_.-]+)/gu;
 
 const EMOJI_ONLY = /^(?:\p{Extended_Pictographic}|\p{Emoji_Component}|‍|️|\s){1,24}$/u;
 

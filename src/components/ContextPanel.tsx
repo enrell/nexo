@@ -387,7 +387,7 @@ function ProfileView({ s, pub, open }: { s: Session; pub: string; open: OpenModa
   return (
     <>
       <div className="prof">
-        <div className="banner" style={{ background: `linear-gradient(135deg, ${prof.color}, var(--a2))` }} />
+        <div className="banner" style={{ background: prof.color }} />
         <div className="prof-top">
           <Avatar name={prof.name} color={prof.color} src={prof.avatar} size={72} status={prof.online ? (prof.status ?? "online") : "offline"} ring="var(--panel-solid)" />
         </div>

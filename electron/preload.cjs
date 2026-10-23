@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("nexo", {
   getVersion: () => ipcRenderer.invoke("nexo:version"),
   fetchPreview: (url) => ipcRenderer.invoke("nexo:preview", url),
   installUpdate: () => ipcRenderer.invoke("nexo:install-update"),
+  checkUpdate: () => ipcRenderer.invoke("nexo:check-update"),
   setConfig: (c) => ipcRenderer.send("nexo:config", c),
   setBadge: (count, dataUrl) => ipcRenderer.send("nexo:badge", count, dataUrl),
   focus: () => ipcRenderer.send("nexo:focus"),

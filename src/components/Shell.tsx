@@ -7,12 +7,12 @@ import { ChatsTeardrop, Check, Copy, DotsThree, GearSix, Palette, UserCircle } f
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useApp, type CtxView } from "../lib/app";
 import { selfId } from "../lib/session";
-import { planetGradient } from "../lib/theme";
+import { serverColor } from "../lib/theme";
 import type { Status } from "../lib/types";
 import { Avatar, Icons, STATUS_LABEL, keyLabel } from "./common";
 import { openMenu, type MenuItem } from "./ContextMenu";
 
-export type OpenModal = (m: "add" | "invite" | "settings" | "server-settings" | "golive" | "golive-camera" | "channel") => void;
+export type OpenModal = (m: "add" | "join" | "invite" | "settings" | "server-settings" | "golive" | "golive-camera" | "channel") => void;
 
 // ------------------------------------------------------------------ menu ancorado
 
@@ -194,7 +194,7 @@ export function Worlds({ open }: { open: OpenModal }) {
           <button
             key={srv.sid}
             className={"planet srv-planet" + (active ? " on" : "")}
-            style={{ background: planetGradient(srv.sid) }}
+            style={{ background: serverColor(srv.sid) }}
             data-tip={srv.name + (live ? " · alguém ao vivo" : "")}
             aria-label={srv.name}
             onClick={() => a.selectServer(srv.roomId)}

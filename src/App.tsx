@@ -1,11 +1,11 @@
 import { ChatsTeardrop, Plus } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import "@fontsource-variable/inter";
-import "@fontsource-variable/space-grotesk";
 import "./App.css";
 import { resetLocalData, useApp } from "./lib/app";
 import type { Session } from "./lib/session";
 import { ChatView } from "./components/Chat";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { ContextPanel } from "./components/ContextPanel";
 import { LightboxHost } from "./components/Lightbox";
@@ -51,15 +51,18 @@ export default function App() {
 
   return (
     <div className={"app" + (theater ? " theater" : "") + (collapsed ? " ctx-collapsed" : "")}>
-      <div className="stars" aria-hidden />
       {!theater && <YouPanel open={setModal} />}
       {!theater && <Worlds open={setModal} />}
       {!theater && <FindPanel />}
       {!theater && (s ? <ServerColumn s={s} open={setModal} /> : <HomeColumn onAdd={() => setModal("add")} />)}
-      <main className="main panel">{s ? !s.isMember() ? <Waiting s={s} /> : a.view.type === "live" ? <LiveView s={s} origin={a.view.origin} /> : <ChatView s={s} /> : <Home onAdd={() => setModal("add")} />}</main>
+      <main className="main panel">
+        <ErrorBoundary what="esta conversa" resetKey={a.activeRoom + ":" + (s ? a.channelOf(s) : "") + ":" + a.view.type}>
+          {s ? !s.isMember() ? <Waiting s={s} /> : a.view.type === "live" ? <LiveView s={s} origin={a.view.origin} /> : <ChatView s={s} /> : <Home onAdd={() => setModal("add")} onJoin={() => setModal("join")} />}
+        </ErrorBoundary>
+      </main>
       {!theater && !collapsed && <ContextPanel open={setModal} />}
 
-      {modal === "add" && <AddServerModal onClose={close} />}
+      {(modal === "add" || modal === "join") && <AddServerModal initialTab={modal === "join" ? "join" : "create"} onClose={close} />}
       {modal === "invite" && s && <InviteModal s={s} onClose={close} />}
       {modal === "settings" && <SettingsScreen onClose={close} />}
       {modal === "server-settings" && s && <ServerSettingsScreen s={s} onClose={close} />}
@@ -114,7 +117,7 @@ function HomeColumn({ onAdd }: { onAdd: () => void }) {
         </div>
       </div>
       <div className="side-scroll">
-        <p className="side-hint">Amigos e conversas diretas (sem servidor) chegam na próxima versão.</p>
+        <p className="side-hint">Daqui você chama amigos para os seus servidores e entra com o convite de alguém. Conversas diretas chegam na próxima versão.</p>
         <button className="chan" onClick={onAdd}>
           <Plus size={17} weight="bold" />
           <span>Criar ou entrar em servidor</span>

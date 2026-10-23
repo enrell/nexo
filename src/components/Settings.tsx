@@ -578,7 +578,18 @@ function VoiceSection() {
       )}
 
       <h3>Processamento de voz</h3>
-      <Toggle label="Supressão de ruído" hint="Corta ventilador, teclado e barulho de fundo." checked={st.noiseSuppression} onChange={(v) => set({ noiseSuppression: v })} />
+      <Toggle
+        label="Supressão de ruído"
+        hint={
+          a.audio.denoiseStatus === "fallback"
+            ? "A IA não carregou; usando o redutor do navegador, que é mais fraco. Desligue e ligue para tentar de novo."
+            : a.audio.denoiseStatus === "loading"
+              ? "Carregando a IA… até lá o redutor do navegador cobre."
+              : "IA (DeepFilterNet) no seu computador: corta ventilador, teclado, vozes ao fundo e barulho."
+        }
+        checked={st.noiseSuppression}
+        onChange={(v) => set({ noiseSuppression: v })}
+      />
       <Toggle label="Cancelamento de eco" hint="Evita que os outros se ouçam de volta se você usa caixa de som." checked={st.echoCancellation} onChange={(v) => set({ echoCancellation: v })} />
       <Toggle label="Ganho automático" hint="Equilibra o volume da sua voz." checked={st.autoGain} onChange={(v) => set({ autoGain: v })} />
 
@@ -781,15 +792,7 @@ function AboutSection() {
           <p className="dim">Chat, voz e lives entre amigos, direto de PC pra PC. Sem servidor central.</p>
         </div>
       </div>
-      {a.update?.status === "ready" ? (
-        <button className="btn" onClick={() => window.nexo?.installUpdate()}>
-          Reiniciar e atualizar para {a.update.version}
-        </button>
-      ) : a.update?.status === "downloading" ? (
-        <p className="dim">Baixando a versão {a.update.version}…</p>
-      ) : (
-        <p className="dim small">O Nexo procura atualizações sozinho ao abrir.</p>
-      )}
+      <UpdateStatus update={a.update} />
       <h3>Diagnóstico</h3>
       <p className="dim small">Se algo der errado, exporte o diagnóstico e mande para quem está ajudando. Não inclui mensagens, senhas nem sua chave.</p>
       <button className="btn ghost" onClick={exportDiag}>
@@ -1064,4 +1067,34 @@ export function ServerSettingsScreen({ s, onClose }: { s: Session; onClose: () =
     },
   ];
   return <FullScreen sections={sections} onClose={onClose} title={st.name} />;
+}
+
+/** Atualização automática: o app procura sozinho (ao abrir e a cada 4 h); aqui dá para ver o estado e forçar. */
+function UpdateStatus({ update }: { update: NexoUpdate | null }) {
+  const busy = update?.status === "checking" || update?.status === "downloading";
+  if (update?.status === "ready")
+    return (
+      <div className="row center wrap">
+        <button className="btn" onClick={() => window.nexo?.installUpdate()}>
+          Reiniciar e atualizar para {update.version}
+        </button>
+        <span className="dim small">Se preferir, ela é instalada quando você fechar o Nexo.</span>
+      </div>
+    );
+  return (
+    <div className="field">
+      <div className="row center wrap">
+        <button className="btn ghost" disabled={busy || !window.nexo} onClick={() => window.nexo?.checkUpdate()}>
+          Procurar atualizações
+        </button>
+        <span className={"small " + (update?.status === "error" ? "danger-text" : "dim")} role="status">
+          {update?.status === "checking" && "Procurando…"}
+          {update?.status === "downloading" && `Baixando a versão ${update.version}… ${update.percent ?? 0}%`}
+          {update?.status === "none" && "Você está na versão mais recente."}
+          {update?.status === "error" && update.message}
+          {(!update || update.status === "idle") && "O Nexo procura atualizações sozinho ao abrir e a cada 4 horas."}
+        </span>
+      </div>
+    </div>
+  );
 }

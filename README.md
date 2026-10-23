@@ -8,7 +8,7 @@ Chat de texto, voz e lives entre amigos, com cara de Discord e **sem servidor ce
 
 Baixe o `Nexo-Setup-<versão>.exe` da [última release](https://github.com/enrell/nexo/releases/latest). Ele instala com um clique (sem pedir administrador), cria atalhos e abre o app. Depois disso o Nexo abre em menos de 1 s e se atualiza sozinho.
 
-O instalador ainda não é assinado digitalmente, então o Windows SmartScreen avisa: clique em *Mais informações → Executar assim mesmo*. Para conferir que o arquivo é o publicado pelo pipeline: `gh attestation verify Nexo-Setup-<versão>.exe -R enrell/nexo` (ou compare com o `SHA256SUMS.txt` da release).
+O instalador ainda não tem a assinatura da Microsoft, então o Windows SmartScreen avisa na primeira instalação: clique em *Mais informações → Executar assim mesmo*. Para conferir que o arquivo é o publicado pelo pipeline: `gh attestation verify Nexo-Setup-<versão>.exe -R enrell/nexo` (ou compare com o `SHA256SUMS.txt` da release).
 
 ## Como usar
 
@@ -22,10 +22,36 @@ O instalador ainda não é assinado digitalmente, então o Windows SmartScreen a
 ```bash
 npm install
 npm run dev        # Vite + Electron com hot reload
+npm test           # testes unitários (~400, 2 s, sem rede nem Electron)
+npm run test:cov   # idem, com cobertura e limite mínimo (o CI usa este)
+npm run test:mutation  # quebra regras de segurança de propósito e confere que os testes falham
 npm run test:e2e   # 21 etapas com várias instâncias reais conectadas por P2P
 npm run dist       # gera release/Nexo-Setup-<versão>.exe (sem publicar)
 npm run icons      # regenera build/icon.png e build/tray*.png a partir de public/logo.svg
 ```
+
+Com [just](https://just.systems) (Windows e Linux): `just setup` (primeira vez), `just dev`, `just check`, `just dist` (gera o instalador do sistema atual em `release/`) e `just install` (instala o que foi gerado). No Linux o pacote é um AppImage, instalado só para o usuário em `~/.local` (`just uninstall` remove). Dentro do WSL, `just dist-win` gera o `.exe` sem `wine` (os programas do electron-builder rodam direto no Windows, via `scripts/wsl-wine`) e `just install-win` gera e instala no Windows hospedeiro; em outro Linux, `dist-win` usa o `wine`. `just` lista todas as receitas.
+
+### Atualização automática
+
+O app procura atualização ao abrir e a cada 4 h, baixa só a diferença em segundo plano e avisa; *Reiniciar e atualizar* troca de versão em silêncio e reabre o app (ou ela é instalada ao fechar). *Configurações → Sobre* mostra o estado e tem *Procurar atualizações*. Como o instalador não é assinado pela Microsoft, a confiança vem de uma **chave Ed25519 do projeto**: o CI assina (versão + SHA-512 do instalador) no `latest.yml` e o app recusa qualquer atualização que não confira (`electron/updatesig.cjs`).
+
+- Uma vez: `just update-keygen ~/nexo-update-key.pem`, cadastrar a privada com `gh secret set UPDATE_SIGNING_KEY < ~/nexo-update-key.pem`, guardar uma cópia fora do computador (perdê-la impede atualizar quem já instalou) e colocar a pública impressa em `PUBLIC_KEYS` (`electron/updatesig.cjs`).
+- Todo release: o workflow assina sozinho (`scripts/sign-update.mjs`) e falha, antes de publicar, se o segredo estiver ausente ou for de outra chave.
+
+### Redutor de ruído
+
+A supressão de ruído da voz é o **DeepFilterNet3** (rede neural, MIT OR Apache-2.0) compilado do código oficial para WebAssembly e executado num AudioWorklet, dentro do computador, a 48 kHz. Tudo vai no instalador (`public/denoise/`, ~19 MB, com `SHA256SUMS`, `NOTICE.md` e as licenças) e o app não baixa nada de fora. Para atualizar a versão: `just denoise-build` (precisa de Rust com o alvo `wasm32-unknown-unknown` e do `wasm-bindgen-cli`; o script explica); depois rode os testes, que conferem os hashes e medem a supressão com o modelo real.
+
+### Testes
+
+| Camada | O que cobre | Onde |
+|---|---|---|
+| Unitários (Vitest) | regras de moderação e convergência do log (`derive`), validação e assinatura dos eventos de rede (`events`, `sanitize`), cofre, identidade, backup, armazenamento e banco cifrados, convites, tema, Markdown, `ErrorBoundary`, guarda anti-SSRF e extração de prévias, redutor de ruído (o modelo real, no mesmo processador de áudio do app, contra ruído e fala) e o caminho do microfone | `tests/unit/` |
+| Mutação | cada regra de segurança é quebrada de propósito, uma por vez; se nenhum teste falha, falta um teste | `scripts/mutation-check.mjs` |
+| Ponta a ponta (Playwright + Electron) | várias instâncias reais conectadas por P2P: chat, sincronização, anexos, voz, live, moderação, persistência | `tests/e2e.mjs` |
+
+Os unitários exigem cobertura mínima (90% das linhas, 80% dos ramos) nos módulos de regra e segurança. `session.ts`, `audio.ts`, `rtc.ts` e as telas ficam por conta do teste ponta a ponta. Ao achar um bug, escreva primeiro o teste que o reproduz.
 
 ### Publicar uma versão
 
@@ -35,16 +61,16 @@ Releases saem **só pelo GitHub Actions**, a partir de uma tag `vX.Y.Z`: o pipel
 
 | Workflow | Quando | O que faz |
 |---|---|---|
-| `ci` | push em `main` e PRs | typecheck, build, `npm audit` (produção), e2e, instalador como artefato |
+| `ci` | push em `main` e PRs | typecheck (app e testes), testes unitários com cobertura (Windows e Linux), build, `npm audit` (produção), e2e, instalador como artefato |
 | `release` | tag `vX.Y.Z` | tudo do CI + publica a release com notas do CHANGELOG, SHA256SUMS e atestado |
 | `codeql` | push, PRs e semanal | análise estática de segurança (`security-extended`) |
 | Dependabot | semanal | atualizações de dependências npm e Actions (fixadas por hash) |
 
 ## O que tem
 
-- **Interface "Constelação"**: grade de 3 colunas com o topo alinhado (você · servidores · busca), servidores como planetas, chat em balões e um painel contextual à direita que troca de conteúdo no lugar (agora, perfil, membros, busca, personalização). Personalizável: cores, fundo (inclusive imagem sua, guardada cifrada), opacidade dos painéis, cantos e densidade. Ícones [Phosphor](https://phosphoricons.com).
+- **Interface "Constelação"**: grade de 3 colunas com o topo alinhado (você · servidores · busca), servidores numa barra horizontal, chat em balões e um painel contextual à direita que troca de conteúdo no lugar (agora, perfil, membros, busca, personalização). Personalizável: cores, fundo (inclusive imagem sua, guardada cifrada), opacidade dos painéis, cantos e densidade. Ícones [Phosphor](https://phosphoricons.com).
 - **Chat**: markdown (negrito, itálico, código, spoiler, citação), @menções com notificação, responder, editar (↑), apagar, reações, emojis, imagens e arquivos de até 25 MB (colar, arrastar ou clipe), prévia de links e YouTube, "digitando…", divisor de novas mensagens, busca no canal, mensagens pendentes quando ninguém está online.
-- **Voz**: escolha de microfone, saída e câmera, teste de microfone, volume de entrada e saída, detecção de voz automática ou manual, **push-to-talk global** (funciona dentro do jogo, aceita botões laterais do mouse), supressão de ruído, eco e ganho, anel verde em quem fala, volume individual por pessoa (0–200%), "mutar para mim", sons de entrar, sair e mutar.
+- **Voz**: escolha de microfone, saída e câmera, teste de microfone, volume de entrada e saída, detecção de voz automática ou manual, **push-to-talk global** (funciona dentro do jogo, aceita botões laterais do mouse), supressão de ruído por IA (DeepFilterNet, roda no seu computador), eco e ganho, anel verde em quem fala, volume individual por pessoa (0–200%), "mutar para mim", sons de entrar, sair e mutar.
 - **Live**: tela, janela ou câmera com áudio do PC, presets de qualidade, codec por placa de vídeo (H.264), miniatura ao passar o mouse, lista de espectadores, modo teatro (T), tela cheia (F), janela flutuante, estatísticas, retransmissão em árvore entre espectadores.
 - **Moderação**: aprovação de novos membros (ligada por padrão), o dono nomeia admins, admins banem (o banido é recusado por todos), gerenciam canais e renovam o convite.
 - **Segurança**: dados locais cifrados (AES-256-GCM, chave protegida pelo Windows), mensagens assinadas (Ed25519), handshake com channel binding contra intermediário, verificação de identidade por número de segurança, backup da conta com senha, prévias de link e conteúdo de notificação desligados por padrão. Detalhes em [SECURITY.md](SECURITY.md).
@@ -79,4 +105,5 @@ Releases saem **só pelo GitHub Actions**, a partir de uma tag `vX.Y.Z`: o pipel
 - `src/lib/identity.ts`, `rtc.ts`, `audio.ts`: chaves e backup, certificado DTLS/codecs, motor de voz
 - `src/lib/app.ts`: estado global (servidores, perfil, configurações, notificações)
 - `src/components/`: interface
-- `tests/e2e.mjs`: teste ponta a ponta
+- `src/lib/events.ts`, `src/lib/sanitize.ts`: tudo que chega da rede (eventos, presença, perfil) é validado aqui antes de ser guardado ou desenhado
+- `tests/unit/`: testes unitários; `tests/e2e.mjs`: teste ponta a ponta

@@ -42,7 +42,10 @@ jobs:
         run: |
           node node_modules/electron/install.js
           test -f node_modules/electron/dist/electron.exe && echo "electron.exe ok"
+      - run: npm run typecheck
       - run: npm run build
+      - name: Testes unitários (com limite mínimo de cobertura)
+        run: npm run test:cov
       - name: Auditoria das dependências de produção
         run: npm audit --omit=dev --audit-level=high
       - name: Teste ponta a ponta
@@ -63,6 +66,18 @@ jobs:
         run: npx electron-builder --win --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # o instalador não tem assinatura da Microsoft: a atualização automática confia na chave do projeto.
+      # O segredo é a chave privada (scripts/update-keygen.mjs); o app só aceita o que ela assinou.
+      - name: Assinar a atualização (chave do projeto)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          test -n "$UPDATE_SIGNING_KEY" || { echo "::error::falta o segredo UPDATE_SIGNING_KEY (gh secret set UPDATE_SIGNING_KEY < chave.pem)"; exit 1; }
+          node scripts/sign-update.mjs release/latest.yml
+          gh release upload "$GITHUB_REF_NAME" release/latest.yml --clobber -R "$GITHUB_REPOSITORY"
 
       - name: SHA256SUMS
         shell: bash
@@ -85,6 +100,8 @@ jobs:
           for f in "Nexo-Setup-${GITHUB_REF_NAME#v}.exe" latest.yml; do
             case " $ASSETS " in *" $f "*) ;; *) echo "::error::falta $f na release"; exit 1;; esac
           done
+          # a release publicada tem que carregar a assinatura: sem ela, nenhum app instalado aceitaria a atualização
+          gh release download "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" -p latest.yml -O - | grep -q '^nexoSignature: ' || { echo "::error::latest.yml da release sem nexoSignature"; exit 1; }
           gh release upload "$GITHUB_REF_NAME" release/SHA256SUMS.txt --clobber -R "$GITHUB_REPOSITORY"
           {
             cat release-notes.md

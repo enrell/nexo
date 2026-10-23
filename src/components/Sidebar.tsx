@@ -6,7 +6,7 @@ import { BellSlash, Broadcast, Eye, LockSimple, Planet, PlusCircle, SignOut, Sli
 import { useRef, useState } from "react";
 import { useApp } from "../lib/app";
 import { selfId, type Session } from "../lib/session";
-import { planetGradient } from "../lib/theme";
+import { serverColor } from "../lib/theme";
 import { Avatar, Icons } from "./common";
 import { openMenu, type MenuItem } from "./ContextMenu";
 import { memberMenu } from "./Members";
@@ -40,7 +40,7 @@ export function ServerColumn({ s, open }: { s: Session; open: OpenModal }) {
     <aside className="side panel">
       <div className={"srv-head" + (menu ? " open" : "")} ref={head}>
         <button className="srv-btn side-head" onClick={() => setMenu(!menu)} aria-haspopup="menu" aria-expanded={menu}>
-          <span className="emb" style={{ background: planetGradient(s.server.sid) }}>
+          <span className="emb" style={{ background: serverColor(s.server.sid) }}>
             {initials(st.name)}
           </span>
           <span className="srv-txt">

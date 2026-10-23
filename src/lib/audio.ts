@@ -8,6 +8,7 @@ import type { Settings } from "./types";
 type Remote = { pub: string; el: HTMLAudioElement; src: MediaStreamAudioSourceNode; gain: GainNode; analyser: AnalyserNode; speakingUntil: number };
 
 import { storage } from "./storage";
+import { createDenoiseNode, DENOISE_RATE, loadDenoiseAssets } from "./denoise";
 
 const VOL_KEY = "uservol";
 const LOCAL_MUTE_KEY = "localmute";
@@ -30,6 +31,16 @@ export class AudioEngine {
   private inAnalyser: AnalyserNode | null = null;
   private gate: GainNode | null = null;
   private dest: MediaStreamAudioDestinationNode | null = null;
+  private micSrc: MediaStreamAudioSourceNode | null = null;
+  /** redutor de ruído por IA (DeepFilterNet): criado uma vez por AudioContext e reaproveitado */
+  private denoise: AudioWorkletNode | null = null;
+  private denoising = false;
+  private denoiseLoading: Promise<void> | null = null;
+  /** o redutor falhou: usa o do navegador até o usuário religar a opção */
+  denoiseBroken = false;
+  private lastNoiseSuppression: boolean | null = null;
+  /** avisos para o usuário (o app mostra como toast) */
+  onNotice: (text: string) => void = () => {};
   micLevel = -100;
   private gateOpenUntil = 0;
   private pttUntil = 0;
@@ -57,7 +68,7 @@ export class AudioEngine {
 
   private ensureCtx() {
     if (!this.ctx) {
-      this.ctx = new AudioContext({ latencyHint: "interactive" });
+      this.ctx = new AudioContext({ latencyHint: "interactive", sampleRate: DENOISE_RATE });
       this.master = this.ctx.createGain();
       this.master.connect(this.ctx.destination);
       this.applySettings();
@@ -69,38 +80,113 @@ export class AudioEngine {
 
   applySettings() {
     const s = this.settings();
+    // desligou e religou a supressão de ruído: dá outra chance ao redutor por IA
+    if (s.noiseSuppression && this.lastNoiseSuppression === false) this.denoiseBroken = false;
+    this.lastNoiseSuppression = s.noiseSuppression;
     if (this.master) this.master.gain.value = this.deafened ? 0 : s.outputVolume / 100;
     if (this.inGain) this.inGain.gain.value = s.inputVolume / 100;
     const ctx = this.ctx as (AudioContext & { setSinkId?: (id: string) => Promise<void> }) | null;
     if (ctx?.setSinkId) ctx.setSinkId(s.outputDevice === "default" ? "" : s.outputDevice).catch((e) => console.warn("setSinkId", e));
   }
 
-  /** Abre o microfone e devolve a stream processada que vai para os outros. */
-  async startMic(): Promise<MediaStream> {
-    const ctx = this.ensureCtx();
-    this.stopMic();
+  /** `on`: DeepFilterNet · `loading`: carregando (o navegador cobre até lá) · `fallback`: falhou · `off`: desligado · `idle`: microfone fechado */
+  get denoiseStatus(): "on" | "loading" | "fallback" | "off" | "idle" {
+    if (!this.settings().noiseSuppression) return "off";
+    if (this.denoising) return "on";
+    if (this.denoiseBroken) return "fallback";
+    return this.denoiseLoading ? "loading" : "idle";
+  }
+
+  /** o redutor está carregado e deve ser usado agora */
+  private denoiseReady() {
+    return !!this.denoise && this.settings().noiseSuppression && !this.denoiseBroken;
+  }
+
+  /**
+   * Carrega o redutor sem segurar o microfone (o modelo leva ~1 s para subir): até lá vale a supressão do
+   * navegador, e quando ele fica pronto o microfone troca para ele sem trocar a stream enviada.
+   */
+  private loadDenoise(ctx: AudioContext) {
+    if (this.denoise || this.denoiseLoading || this.denoiseBroken || !this.settings().noiseSuppression) return;
+    this.denoiseLoading = (async () => {
+      try {
+        this.denoise = await createDenoiseNode(ctx, await loadDenoiseAssets(), (m) => this.denoiseFailed(m));
+      } catch (e) {
+        this.denoiseLoading = null;
+        this.denoiseFailed(e instanceof Error ? e.message : String(e));
+        return;
+      }
+      this.denoiseLoading = null;
+      if (this.micStream && this.denoiseReady() && !this.denoising) await this.restartMic().catch((e) => console.warn("restartMic", e));
+      this.onChange();
+    })();
+    this.onChange();
+  }
+
+  /** para os testes: espera o carregamento em andamento */
+  whenDenoiseSettled() {
+    return this.denoiseLoading ?? Promise.resolve();
+  }
+
+  private denoiseFailed(message: string) {
+    console.warn("redutor de ruído indisponível:", message);
+    if (this.denoiseBroken) return;
+    const wasOn = this.denoising;
+    this.denoiseBroken = true;
+    this.denoise?.disconnect();
+    this.denoise = null;
+    this.denoising = false;
+    this.onNotice(`O redutor de ruído por IA não carregou (${message}); usando o do navegador.`);
+    // se o microfone passava pelo redutor, reabre já com a supressão do navegador
+    if (wasOn && this.micStream) this.restartMic().catch((e) => console.warn("restartMic", e));
+    this.onChange();
+  }
+
+  private openRaw(useDenoise: boolean) {
     const s = this.settings();
-    this.raw = await navigator.mediaDevices.getUserMedia({
+    return navigator.mediaDevices.getUserMedia({
       audio: {
         deviceId: s.inputDevice && s.inputDevice !== "default" ? { exact: s.inputDevice } : undefined,
         echoCancellation: s.echoCancellation,
-        noiseSuppression: s.noiseSuppression,
+        // com o DeepFilterNet ligado o do navegador sairia por cima dele: duas camadas estragam a voz
+        noiseSuppression: s.noiseSuppression && !useDenoise,
         autoGainControl: s.autoGain,
         channelCount: 1,
       },
     });
-    const src = ctx.createMediaStreamSource(this.raw);
+  }
+
+  /** microfone → (redutor de ruído) → ganho de entrada */
+  private wireMic(ctx: AudioContext, raw: MediaStream, useDenoise: boolean) {
+    const into = this.inGain!;
+    this.micSrc?.disconnect();
+    this.denoise?.disconnect();
+    this.micSrc = ctx.createMediaStreamSource(raw);
+    this.denoising = useDenoise && !!this.denoise;
+    if (this.denoising) {
+      this.micSrc.connect(this.denoise!);
+      this.denoise!.connect(into);
+    } else this.micSrc.connect(into);
+  }
+
+  /** Abre o microfone e devolve a stream processada que vai para os outros. */
+  async startMic(): Promise<MediaStream> {
+    const ctx = this.ensureCtx();
+    this.stopMic();
+    const useDenoise = this.denoiseReady();
+    this.raw = await this.openRaw(useDenoise);
     this.inGain = ctx.createGain();
     this.inAnalyser = ctx.createAnalyser();
     this.inAnalyser.fftSize = 1024;
     this.gate = ctx.createGain();
     this.gate.gain.value = 0;
     this.dest = ctx.createMediaStreamDestination();
-    src.connect(this.inGain);
+    this.wireMic(ctx, this.raw, useDenoise);
     this.inGain.connect(this.inAnalyser);
     this.inGain.connect(this.gate);
     this.gate.connect(this.dest);
     this.applySettings();
+    if (!useDenoise) this.loadDenoise(ctx);
     return this.dest.stream;
   }
 
@@ -108,28 +194,32 @@ export class AudioEngine {
     return this.dest?.stream ?? null;
   }
 
-  /** Troca o dispositivo sem trocar a stream enviada (os outros não percebem). */
+  /** Troca o dispositivo (ou o redutor de ruído) sem trocar a stream enviada (os outros não percebem). */
   async restartMic() {
-    if (!this.raw || !this.ctx || !this.inGain) return;
-    const s = this.settings();
-    const raw = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        deviceId: s.inputDevice && s.inputDevice !== "default" ? { exact: s.inputDevice } : undefined,
-        echoCancellation: s.echoCancellation,
-        noiseSuppression: s.noiseSuppression,
-        autoGainControl: s.autoGain,
-        channelCount: 1,
-      },
-    });
-    this.raw.getTracks().forEach((t) => t.stop());
+    const current = this.raw;
+    const ctx = this.ctx;
+    if (!current || !ctx || !this.inGain) return;
+    const useDenoise = this.denoiseReady();
+    if (!useDenoise) this.loadDenoise(ctx);
+    const raw = await this.openRaw(useDenoise);
+    if (this.raw !== current) {
+      // o microfone foi fechado (ou reiniciado) enquanto esperávamos
+      raw.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    current.getTracks().forEach((t) => t.stop());
     this.raw = raw;
-    this.ctx.createMediaStreamSource(raw).connect(this.inGain);
+    this.wireMic(ctx, raw, useDenoise);
   }
 
   stopMic() {
     this.raw?.getTracks().forEach((t) => t.stop());
     this.dest?.stream.getTracks().forEach((t) => t.stop());
+    this.micSrc?.disconnect();
+    this.denoise?.disconnect();
     this.raw = null;
+    this.micSrc = null;
+    this.denoising = false;
     this.dest = null;
     this.gate = null;
     this.inGain = null;

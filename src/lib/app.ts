@@ -14,7 +14,7 @@ export type View = { type: "chat" } | { type: "live"; origin: string };
 export type CtxView = "home" | "members" | "profile" | "search" | "theme" | "notifications";
 type CtxState = { view: CtxView; arg?: string };
 
-export const COLORS = ["#5865f2", "#eb459e", "#57f287", "#fee75c", "#ed4245", "#f47b67", "#3ba55c", "#9b59b6", "#1abc9c", "#e67e22"];
+export const COLORS = ["#dd8566", "#e0b050", "#93b87a", "#78a9c9", "#a994c9", "#d98aa6", "#6fbfae", "#c9a27a", "#e07a6a", "#9aa7b8"];
 export const randomColor = () => COLORS[Math.floor(Math.random() * COLORS.length)];
 
 class App {
@@ -44,7 +44,7 @@ class App {
   autoIdle = false;
   toast: { text: string; kind: "info" | "error" } | null = null;
   pendingInvite: string | null = null;
-  update: { status: string; version?: string } | null = null;
+  update: NexoUpdate | null = null;
   audio: AudioEngine;
 
   private version = 0;
@@ -55,6 +55,7 @@ class App {
   constructor() {
     this.audio = new AudioEngine(() => this.settings);
     this.audio.onChange = () => this.emit();
+    this.audio.onNotice = (text) => this.showToast(text, "error");
     this.init();
   }
 
@@ -131,7 +132,7 @@ class App {
     n.getPendingUrl().then((url) => url && this.handleInviteUrl(url));
     n.onUpdate((u) => {
       this.update = u;
-      if (u.status === "ready") this.showToast(`Versão ${u.version} baixada — reinicie para atualizar.`);
+      if (u.status === "ready") this.showToast(`Versão ${u.version} baixada. Reinicie para atualizar.`);
       this.emit();
     });
     n.onTray((action) => {

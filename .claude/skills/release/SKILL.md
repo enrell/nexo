@@ -122,7 +122,7 @@ gh run watch "$(gh run list --workflow release --limit 1 --json databaseId -q '.
 gh release view vX.Y.Z --json isDraft,isLatest,assets -q '{draft: .isDraft, latest: .isLatest, assets: [.assets[].name]}'
 ```
 
-Tem que existir **uma única** release para a tag (`gh api repos/enrell/nexo/releases --jq '[.[] | select(.tag_name=="vX.Y.Z")] | length'` → `1`). Ela tem que estar `draft: false` e `latest: true`, e conter: `Nexo-Setup-X.Y.Z.exe`, `Nexo-Setup-X.Y.Z.exe.blockmap`, `latest.yml` e `SHA256SUMS.txt`. Verifique o atestado:
+Tem que existir **uma única** release para a tag (`gh api repos/enrell/nexo/releases --jq '[.[] | select(.tag_name=="vX.Y.Z")] | length'` → `1`). Ela tem que estar `draft: false` e `latest: true`, e conter: `Nexo-Setup-X.Y.Z.exe`, `Nexo-Setup-X.Y.Z.exe.blockmap`, `latest.yml` e `SHA256SUMS.txt`. O `latest.yml` publicado precisa ter a linha `nexoSignature:` (o workflow assina com o segredo `UPDATE_SIGNING_KEY`; sem ela nenhum app instalado aceita a atualização): `gh release download vX.Y.Z -p latest.yml -O - | grep nexoSignature`. Verifique o atestado:
 
 ```bash
 gh release download vX.Y.Z -p 'Nexo-Setup-*.exe' -D "$TMP/nexo-rel" --clobber

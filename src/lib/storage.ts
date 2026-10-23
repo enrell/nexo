@@ -1,8 +1,10 @@
 import type { Profile, ServerInfo, Settings } from "./types";
 
+import { THEME_REV } from "./theme";
 import { openString, sealString } from "./vault";
 
 const PREFIX = "nexo:";
+export const QUARANTINE = "nexo-ilegivel:";
 const cache = new Map<string, unknown>();
 const writes = new Map<string, Promise<void>>();
 
@@ -28,7 +30,10 @@ export async function initSecureStore() {
         write(k, v); // migra texto puro → cifrado
       }
     } catch (e) {
-      console.warn("registro local ilegível, descartado:", k, e);
+      // nunca apagar às cegas: se a leitura falhou por um problema passageiro (ou a chave do cofre mudou),
+      // o registro (ex.: a identidade) ainda pode ser recuperável. Fica guardado fora do caminho do app.
+      console.warn("registro local ilegível, movido para quarentena:", k, e);
+      localStorage.setItem(QUARANTINE + k, raw);
       localStorage.removeItem(PREFIX + k);
     }
   }
@@ -52,6 +57,12 @@ function write(key: string, value: unknown) {
 function remove(key: string) {
   cache.delete(key);
   localStorage.removeItem(PREFIX + key);
+}
+
+/** Só para testes: esquece o que está em memória. */
+export function resetSecureStoreForTests() {
+  cache.clear();
+  writes.clear();
 }
 
 /** Espera todas as gravações pendentes (antes de recarregar o app). */
@@ -86,10 +97,11 @@ export const defaultSettings: Settings = {
   uiSounds: true,
   fontScale: 100,
   zoom: 100,
-  themeAccent: "constelacao",
-  themeBg: "nebulosa",
-  panelAlpha: 92,
-  radius: 18,
+  themeRev: THEME_REV,
+  themeAccent: "argila",
+  themeBg: "carvao",
+  panelAlpha: 100,
+  radius: 10,
   density: "normal",
   ctxCollapsed: false,
   keyMute: "CommandOrControl+Shift+M",
@@ -117,7 +129,12 @@ type LegacyServer = Partial<ServerInfo> & { roomId: string; password: string; na
 export const storage = {
   loadProfile: () => read<Profile | null>("profile", null),
   saveProfile: (p: Profile) => write("profile", p),
-  loadSettings: (): Settings => ({ ...defaultSettings, ...read<Partial<Settings>>("settings", {}) }),
+  loadSettings: (): Settings => {
+    const saved = read<Partial<Settings>>("settings", {});
+    // tema de uma versão anterior (ids de paleta e valores que não existem mais): volta ao padrão
+    if (saved.themeRev !== THEME_REV) for (const k of ["themeAccent", "themeBg", "panelAlpha", "radius"] as const) delete saved[k];
+    return { ...defaultSettings, ...saved, themeRev: THEME_REV };
+  },
   saveSettings: (s: Settings) => write("settings", s),
   loadServers: (): ServerInfo[] =>
     read<LegacyServer[]>("servers", []).map((s) => ({
@@ -162,8 +179,12 @@ export function decodeInvite(input: string): Invite | null {
     if (!m) return null;
     const raw = m[1].replace(/-/g, "+").replace(/_/g, "/");
     const json = JSON.parse(decodeURIComponent(escape(atob(raw))));
-    if (typeof json.r !== "string" || typeof json.p !== "string") return null;
-    return { name: String(json.n ?? "Servidor"), roomId: json.r, password: json.p, owner: typeof json.o === "string" ? json.o : "", sid: typeof json.s === "string" ? json.s : json.r };
+    // o convite chega de fora (link nexo://, área de transferência): nada de campos gigantes ou de tipo errado
+    const word = (v: unknown, max: number) => typeof v === "string" && v.length >= 1 && v.length <= max && /^[\w-]+$/.test(v);
+    if (!json || !word(json.r, 64) || !word(json.p, 128)) return null;
+    const owner = typeof json.o === "string" && /^[A-Za-z0-9_-]{43}$/.test(json.o) ? json.o : "";
+    const name = (typeof json.n === "string" ? json.n.trim() : "").slice(0, 60) || "Servidor";
+    return { name, roomId: json.r, password: json.p, owner, sid: word(json.s, 64) ? json.s : json.r };
   } catch {
     return null;
   }

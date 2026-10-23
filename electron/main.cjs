@@ -1,10 +1,12 @@
 const { app, BrowserWindow, Menu, Tray, desktopCapturer, globalShortcut, ipcMain, nativeImage, powerMonitor, protocol, safeStorage, session, shell } = require("electron");
 const crypto = require("node:crypto");
-const dns = require("node:dns");
 const fs = require("node:fs");
 const https = require("node:https");
 const net = require("node:net");
 const path = require("node:path");
+const { safeLookup } = require("./netguard.cjs");
+const { parsePreview } = require("./preview.cjs");
+const { setupUpdater } = require("./updater.cjs");
 
 const isDev = !app.isPackaged && process.env.NEXO_DEV === "1";
 const DIST = path.join(__dirname, "..", "dist");
@@ -74,7 +76,7 @@ function createWindow() {
     minWidth: 940,
     minHeight: 560,
     show: false, // só mostra quando a interface já desenhou (sem tela branca)
-    backgroundColor: "#313338",
+    backgroundColor: "#131211",
     title: "Nexo",
     icon: ICON,
     autoHideMenuBar: true,
@@ -279,7 +281,7 @@ function applyConfig() {
 
 // ---------------------------------------------------------------- atualização automática
 
-function setupUpdater() {
+function startUpdater() {
   if (!app.isPackaged) return;
   let autoUpdater;
   try {
@@ -287,21 +289,7 @@ function setupUpdater() {
   } catch {
     return;
   }
-  // baixa só por HTTPS do GitHub Releases e confere o SHA-512 publicado no latest.yml
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowDowngrade = false;
-  autoUpdater.allowPrerelease = false;
-  autoUpdater.on("update-available", (i) => send("nexo:update", { status: "downloading", version: i.version }));
-  autoUpdater.on("update-downloaded", (i) => send("nexo:update", { status: "ready", version: i.version }));
-  autoUpdater.on("error", (e) => console.warn("updater:", e?.message));
-  const check = () => autoUpdater.checkForUpdates().catch((e) => console.warn("updater:", e?.message));
-  setTimeout(check, 10_000);
-  setInterval(check, 4 * 60 * 60 * 1000);
-  handle("nexo:install-update", () => {
-    quitting = true;
-    autoUpdater.quitAndInstall();
-  });
+  setupUpdater({ autoUpdater, send, handle, beforeQuit: () => (quitting = true) });
 }
 
 // ---------------------------------------------------------------- inicialização
@@ -326,7 +314,7 @@ app.on("web-contents-created", (_e, contents) => {
 app.whenReady().then(() => {
   const ses = session.defaultSession;
 
-  const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json", ".woff2": "font/woff2" };
+  const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".json": "application/json", ".woff2": "font/woff2", ".wasm": "application/wasm" };
   protocol.handle(APP_SCHEME, async (req) => {
     const url = new URL(req.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
@@ -427,7 +415,7 @@ app.whenReady().then(() => {
 
   createWindow();
   createTray();
-  setupUpdater();
+  startUpdater();
   if (process.argv.includes("--hidden")) win.once("ready-to-show", () => win.hide());
   app.on("activate", showWindow);
 });
@@ -446,28 +434,6 @@ app.on("window-all-closed", () => {
 });
 
 // ---------------------------------------------------------------- prévia de links (opt-in), protegida contra SSRF
-
-/** Endereços que nunca podem ser acessados (rede local, loopback, link-local, CGNAT, multicast…). */
-function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split(".").map(Number);
-    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 198 && (b === 18 || b === 19)) || a >= 224;
-  }
-  const v = ip.toLowerCase();
-  if (v.startsWith("::ffff:")) return isPrivateIp(v.slice(7));
-  return v === "::" || v === "::1" || v.startsWith("fc") || v.startsWith("fd") || v.startsWith("fe8") || v.startsWith("fe9") || v.startsWith("fea") || v.startsWith("feb") || v.startsWith("ff");
-}
-
-// resolve o DNS e recusa IP privado no momento da conexão (evita DNS rebinding)
-function safeLookup(hostname, options, cb) {
-  dns.lookup(hostname, { ...options, all: true }, (err, addrs) => {
-    if (err) return cb(err);
-    const list = addrs.filter((a) => !isPrivateIp(a.address));
-    if (!list.length) return cb(new Error("endereço bloqueado"));
-    if (options.all) cb(null, list);
-    else cb(null, list[0].address, list[0].family);
-  });
-}
 
 function getHtml(url, redirects = 0) {
   return new Promise((resolve, reject) => {
@@ -505,35 +471,11 @@ async function fetchPreview(url) {
   let result = null;
   try {
     const html = await getHtml(url);
-    const meta = (prop) => {
-      const re = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${prop}["']`, "i");
-      const m = html.match(re);
-      return m ? decode(m[1] ?? m[2]) : null;
-    };
-    const title = meta("og:title") ?? meta("twitter:title") ?? decode(html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1] ?? "");
-    if (title) {
-      let image = meta("og:image") ?? meta("twitter:image");
-      if (image) {
-        image = new URL(image, url).toString();
-        if (!image.startsWith("https://")) image = null;
-      }
-      result = { title: title.slice(0, 200), description: (meta("og:description") ?? meta("description") ?? "").slice(0, 300), image, site: (meta("og:site_name") ?? new URL(url).hostname).slice(0, 80) };
-    }
+    result = parsePreview(html, url);
   } catch {
     /* sem prévia */
   }
   if (previewCache.size > 500) previewCache.clear();
   previewCache.set(url, result);
   return result;
-}
-
-function decode(s) {
-  // &amp; por último: "&amp;lt;" vira "&lt;" (texto), não "<"
-  return String(s)
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .trim();
 }

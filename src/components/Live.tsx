@@ -19,6 +19,11 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // a minha live acabou (parei, fechei a janela compartilhada, a câmera caiu): não há o que mostrar aqui, volta ao chat
+  useEffect(() => {
+    if (mine && !live) a.closeLive();
+  }, [mine, !!live]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!mine && live && s.watching?.origin !== origin) s.watch(origin);
   }, [origin, mine, !!live, s]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -88,7 +93,7 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
             Sair da live
           </button>
         )}
-        {mine && (
+        {mine && live && (
           <button className="btn danger small" onClick={() => s.stopLive()}>
             Parar transmissão
           </button>

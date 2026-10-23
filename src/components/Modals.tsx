@@ -3,8 +3,8 @@ import { COLORS, app, randomColor, useApp } from "../lib/app";
 import { mediaErrorMessage } from "../lib/rtc";
 import { selfId, type Session } from "../lib/session";
 import { PRESETS, decodeInvite, encodeInvite, inviteLink, storage } from "../lib/storage";
-import { planetGradient } from "../lib/theme";
-import type { StreamPreset } from "../lib/types";
+import { serverColor } from "../lib/theme";
+import type { ServerInfo, StreamPreset } from "../lib/types";
 import { Avatar, Icons, Modal } from "./common";
 import { initials } from "./Shell";
 
@@ -80,66 +80,113 @@ export function Onboarding() {
   );
 }
 
-/** Início (planeta da casinha): visão geral fora dos servidores. Amigos e diretas chegam aqui. */
-export function Home({ onAdd }: { onAdd: () => void }) {
+/** Início (planeta da casinha): chamar amigos para os seus servidores e entrar com o convite de alguém. */
+export function Home({ onAdd, onJoin }: { onAdd: () => void; onJoin: () => void }) {
   const a = useApp();
+  const [inviting, setInviting] = useState<Session | null>(null);
+  const has = a.servers.length > 0;
+
+  const copyLink = async (srv: ServerInfo) => {
+    try {
+      await navigator.clipboard.writeText(inviteLink(srv));
+      a.showToast(`Link de convite de ${srv.name} copiado. É só mandar para seus amigos.`);
+    } catch {
+      a.showToast("Não consegui copiar o link. Abra o convite e copie por lá.", "error");
+    }
+  };
+
   return (
     <div className="home-view">
       <div className="home-hero">
         <img src="./logo.svg" alt="" width={64} height={64} />
         <div>
           <h1>Olá, {a.effectiveProfile().name}</h1>
-          <p className="dim">{a.servers.length ? "Escolha um servidor no topo ou veja o que está acontecendo à direita." : "Você ainda não está em nenhum servidor."}</p>
+          <p className="dim">{has ? "Chame seus amigos: copie o link de convite de um servidor e mande para eles." : "Você ainda não está em nenhum servidor."}</p>
         </div>
       </div>
-      {a.servers.length > 0 && (
-        <div className="home-grid">
-          {a.servers.map((srv) => {
-            const sess = a.sessions.get(srv.sid);
-            const online = sess ? Object.values(sess.peers).filter((p) => p.profile).length : 0;
-            const unread = a.unreadFor(srv.sid);
-            return (
-              <button key={srv.sid} className="home-card" onClick={() => a.selectServer(srv.roomId)}>
-                <span className="emb big" style={{ background: planetGradient(srv.sid) }}>
-                  {initials(srv.name)}
-                </span>
-                <span className="home-card-txt">
-                  <b className="ellipsis">{srv.name}</b>
-                  <small>
-                    {online} online{unread ? ` · ${unread} novas` : ""}
-                  </small>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+
+      {has && (
+        <>
+          <div className="home-grid">
+            {a.servers.map((srv) => {
+              const sess = a.sessions.get(srv.sid);
+              const online = sess ? Object.values(sess.peers).filter((p) => p.profile).length : 0;
+              const unread = a.unreadFor(srv.sid);
+              const pending = !!sess && !sess.isMember(); // ainda não fui aprovado: não dá para convidar por aqui
+              return (
+                <div key={srv.sid} className="home-card">
+                  <button className="home-card-main" onClick={() => a.selectServer(srv.roomId)} aria-label={`Abrir ${srv.name}`}>
+                    <span className="emb big" style={{ background: serverColor(srv.sid) }}>
+                      {initials(srv.name)}
+                    </span>
+                    <span className="home-card-txt">
+                      <b className="ellipsis">{srv.name}</b>
+                      <small>{pending ? "aguardando aprovação" : `${online} online${unread ? ` · ${unread} novas` : ""}`}</small>
+                    </span>
+                  </button>
+                  {!pending && (
+                    <span className="home-actions">
+                      <button className="btn small" onClick={() => copyLink(srv)}>
+                        <Icons.Link size={15} /> Copiar link
+                      </button>
+                      {sess && (
+                        <button className="btn small ghost" onClick={() => setInviting(sess)} data-tip="Ver link e código de convite">
+                          Convite
+                        </button>
+                      )}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="row wrap">
+            <button className="btn ghost" onClick={onJoin}>
+              Tenho um convite de um amigo
+            </button>
+            <button className="btn ghost" onClick={onAdd}>
+              Criar outro servidor
+            </button>
+          </div>
+        </>
       )}
-      <div className="home-steps">
-        <div>
-          <span className="n">1</span>
-          <b>Crie um servidor</b>
-          <small>para você e seus amigos.</small>
-        </div>
-        <div>
-          <span className="n">2</span>
-          <b>Mande o convite</b>
-          <small>quem clicar no link entra direto (e espera sua aprovação).</small>
-        </div>
-        <div>
-          <span className="n">3</span>
-          <b>Entre na voz e transmita</b>
-          <small>a live vai direto de PC pra PC, cifrada.</small>
-        </div>
-      </div>
-      <button className="btn big" onClick={onAdd}>
-        Criar ou entrar em um servidor
-      </button>
+
+      {!has && (
+        <>
+          <div className="home-steps">
+            <div>
+              <span className="n">1</span>
+              <b>Crie um servidor</b>
+              <small>para você e seus amigos.</small>
+            </div>
+            <div>
+              <span className="n">2</span>
+              <b>Mande o convite</b>
+              <small>quem clicar no link entra direto (e espera sua aprovação).</small>
+            </div>
+            <div>
+              <span className="n">3</span>
+              <b>Entre na voz e transmita</b>
+              <small>a live vai direto de PC pra PC, cifrada.</small>
+            </div>
+          </div>
+          <div className="row wrap">
+            <button className="btn big" onClick={onAdd}>
+              Criar um servidor
+            </button>
+            <button className="btn big ghost" onClick={onJoin}>
+              Tenho um convite
+            </button>
+          </div>
+        </>
+      )}
+      {inviting && <InviteModal s={inviting} onClose={() => setInviting(null)} />}
     </div>
   );
 }
 
-export function AddServerModal({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<"create" | "join">("create");
+export function AddServerModal({ onClose, initialTab = "create" }: { onClose: () => void; initialTab?: "create" | "join" }) {
+  const [tab, setTab] = useState<"create" | "join">(initialTab);
   const [name, setName] = useState(`Servidor de ${app.profile?.name ?? ""}`);
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);

@@ -47,7 +47,8 @@ export type Settings = {
   // aparência
   fontScale: number; // %
   zoom: number; // %
-  // tema (Constelação)
+  // tema
+  themeRev: number; // versão do tema salvo (ver THEME_REV em theme.ts)
   themeAccent: string; // id da paleta de destaque
   themeBg: string; // id do fundo ou "custom" (imagem do usuário, guardada cifrada)
   panelAlpha: number; // 55..100 (% de opacidade dos painéis)

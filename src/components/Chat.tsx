@@ -612,7 +612,7 @@ function Composer({
     for (const p of Object.values(s.peers)) if (p.profile) seen.set(p.pub, p.profile);
     for (const m of Object.values(s.members)) if (!seen.has(m.pub)) seen.set(m.pub, m);
     const list = [...seen.values()].filter((p) => p.name.toLowerCase().includes(q)).slice(0, 7);
-    if ("todos".startsWith(q)) list.push({ name: "todos", color: "#949cf7" });
+    if ("todos".startsWith(q)) list.push({ name: "todos", color: "#dd8566" });
     return list;
   }, [mentionMatch?.[1], s.peers, s.members]); // eslint-disable-line react-hooks/exhaustive-deps
 

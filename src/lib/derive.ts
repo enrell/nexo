@@ -47,6 +47,15 @@ export function derive(events: StoredEvent[], owner: string, seed: { name: strin
     const b = e.b;
     if (banned.has(e.a) && b.k !== "ban") continue;
     if (CONTENT.has(b.k) && !isMember(e.a)) continue;
+    try {
+      apply(e, b);
+    } catch (err) {
+      // um evento malformado que passou pela rede não pode inutilizar o servidor para todo mundo
+      console.warn("evento ignorado ao derivar o estado:", e.id, err);
+    }
+  }
+
+  function apply(e: StoredEvent, b: StoredEvent["b"]) {
     switch (b.k) {
       case "msg":
         if (typeof b.text !== "string" || typeof b.ch !== "string") break;
@@ -60,7 +69,8 @@ export function derive(events: StoredEvent[], owner: string, seed: { name: strin
           reply: b.reply,
           att: Array.isArray(b.att) ? b.att.slice(0, 10) : undefined,
           deleted: false,
-          reactions: {},
+          // sem protótipo: o emoji vem da rede e "constructor"/"toString" não podem virar uma lista já existente
+          reactions: Object.create(null) as Record<string, string[]>,
           pending: e.pending,
         });
         break;
