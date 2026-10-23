@@ -6,6 +6,16 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+### Adicionado
+- Clicar no "AO VIVO" de alguém na sala de voz abre uma prévia da live, com "Assistir" e "Tela cheia".
+- A largura do chat ao lado da live pode ser ajustada arrastando a borda (duplo clique volta ao padrão).
+
+### Corrigido
+- Áudio do PC na transmissão de tela: o Chromium aplicava supressão de ruído, cancelamento de eco e ganho automático ao som do sistema, comendo música e jogo. Agora o som vai sem esses filtros e em estéreo. A live também toca no dispositivo de saída escolhido nas configurações, e avisa quando você está com o som desligado.
+- Busca: em janela estreita a primeira letra depois do Ctrl+K se perdia; o painel não mostra mais "voltar" e "fechar" fazendo a mesma coisa.
+- Na gaveta da janela estreita, o "Recolher painel" duplicava o botão "Painel"; virou "Fechar".
+- O selo "AO VIVO" da sala de voz fica sempre alinhado à direita.
+
 ## [0.4.0] - 2026-10-23
 
 ### Segurança

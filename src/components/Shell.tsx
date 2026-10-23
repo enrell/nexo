@@ -227,14 +227,10 @@ export function FindPanel() {
         e.preventDefault();
         const el = input.current;
         if (!el) return;
-        // janela estreita: o campo só aparece com a gaveta da busca aberta; abre e foca depois de desenhar
-        if (el.getClientRects().length === 0) {
-          a.openCtx("search");
-          // espera a gaveta ser desenhada (até ~0,5 s) antes de focar
-          let tries = 0;
-          const focusWhenShown = () => (el.getClientRects().length ? (el.focus(), el.select()) : ++tries < 30 && requestAnimationFrame(focusWhenShown));
-          requestAnimationFrame(focusWhenShown);
-        } else (el.focus(), el.select());
+        // em janela estreita o campo fica invisível até a gaveta da busca abrir; focar já agora não perde letras
+        el.focus();
+        el.select();
+        if (a.ctx.view !== "search") a.openCtx("search");
       }
     };
     window.addEventListener("keydown", onKey);

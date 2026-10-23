@@ -9,6 +9,7 @@ import { selfId, type Session } from "../lib/session";
 import { serverColor } from "../lib/theme";
 import { Avatar, Icons } from "./common";
 import { openMenu, type MenuItem } from "./ContextMenu";
+import { LivePeek } from "./Live";
 import { memberMenu } from "./Members";
 import { DItem, Dropdown, initials, useDismiss, type OpenModal } from "./Shell";
 
@@ -29,6 +30,7 @@ export function ServerColumn({ s, open }: { s: Session; open: OpenModal }) {
   };
 
   const me = a.effectiveProfile();
+  const [peek, setPeek] = useState<string | null>(null);
   const voice = [
     ...(s.inVoice ? [{ id: selfId, pub: s.me, name: me.name, color: me.color, avatar: me.avatar, muted: a.muted, deaf: a.deafened, live: !!s.myLive }] : []),
     ...Object.entries(s.peers)
@@ -144,9 +146,8 @@ export function ServerColumn({ s, open }: { s: Session; open: OpenModal }) {
                 return (
                   <div key={v.id} className="voice-user" onClick={(e) => openMenu(e, memberMenu(s, v.pub))} onContextMenu={(e) => openMenu(e, memberMenu(s, v.pub))}>
                     <Avatar name={v.name} color={v.color} src={v.avatar} size={22} speaking={talking} />
-                    <span className={"ellipsis" + (talking ? " speaking-name" : "")}>{v.name}</span>
+                    <span className={"ellipsis voice-name" + (talking ? " speaking-name" : "")}>{v.name}</span>
                     <span className="voice-icons">
-                      {v.live && <span className="tag-live">AO VIVO</span>}
                       {a.audio.localMutes.has(v.pub) && v.pub !== s.me && (
                         <span title="Mutado para você">
                           <Icons.MicOff size={14} />
@@ -163,9 +164,22 @@ export function ServerColumn({ s, open }: { s: Session; open: OpenModal }) {
                         </span>
                       )}
                     </span>
+                    {v.live && (
+                      <button
+                        className="tag-live"
+                        data-tip="Ver prévia da live"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPeek(v.id);
+                        }}
+                      >
+                        AO VIVO
+                      </button>
+                    )}
                   </div>
                 );
               })}
+              {peek && <LivePeek s={s} origin={peek} onClose={() => setPeek(null)} />}
             </div>
           </>
         ) : (

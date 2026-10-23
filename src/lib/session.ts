@@ -806,7 +806,9 @@ export class Session {
     if (kind === "screen") {
       if (opts.sourceId && window.nexo) await window.nexo.selectSource(opts.sourceId, audio);
       // restrictOwnAudio: tenta não capturar o som do próprio Nexo (voz dos amigos)
-      const audioC = audio ? ({ restrictOwnAudio: true } as MediaTrackConstraints) : false;
+      // é som de jogo/música, não voz: sem supressão de ruído, cancelamento de eco nem ganho automático
+      // (o Chromium liga os três por padrão e a supressão come boa parte do áudio), e em estéreo
+      const audioC = audio ? ({ restrictOwnAudio: true, echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 2 } as MediaTrackConstraints) : false;
       stream = await navigator.mediaDevices.getDisplayMedia({ video, audio: audioC });
     } else {
       if (s.videoDevice !== "default") video.deviceId = { exact: s.videoDevice };

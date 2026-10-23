@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
   ArrowBendUpLeft,
   Bell,
@@ -68,7 +68,7 @@ export function Avatar({
   );
 }
 
-export function MediaView({ stream, muted, volume = 1, className, videoRef }: { stream: MediaStream | null; muted?: boolean; volume?: number; className?: string; videoRef?: React.RefObject<HTMLVideoElement | null> }) {
+export function MediaView({ stream, muted, volume = 1, className, videoRef, sinkId }: { stream: MediaStream | null; muted?: boolean; volume?: number; className?: string; videoRef?: React.RefObject<HTMLVideoElement | null>; sinkId?: string }) {
   const own = useRef<HTMLVideoElement>(null);
   const ref = videoRef ?? own;
   useEffect(() => {
@@ -80,8 +80,30 @@ export function MediaView({ stream, muted, volume = 1, className, videoRef }: { 
   useEffect(() => {
     if (ref.current) ref.current.volume = Math.min(1, volume);
   }, [volume, ref]);
+  // o som da live sai pelo dispositivo de saída escolhido nas configurações (o <video> usa o padrão do sistema)
+  useEffect(() => {
+    const el = ref.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
+    if (sinkId === undefined || !el?.setSinkId) return;
+    el.setSinkId(sinkId === "default" ? "" : sinkId).catch((e) => console.warn("setSinkId da live", e));
+  }, [sinkId, ref]);
   return <video ref={ref} className={className} autoPlay playsInline muted={muted} />;
 }
+
+/** `true` enquanto a media query casar (ex.: janela estreita) */
+export function useMediaQuery(q: string) {
+  const [match, setMatch] = useState(() => window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setMatch(m.matches);
+    m.addEventListener("change", on);
+    on();
+    return () => m.removeEventListener("change", on);
+  }, [q]);
+  return match;
+}
+
+/** Abaixo disto o painel da direita vira gaveta (mesmo valor do App.css). */
+export const NARROW = "(max-width: 1060px)";
 
 export function Modal({ title, onClose, children, wide, footer }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; footer?: ReactNode }) {
   useEffect(() => {

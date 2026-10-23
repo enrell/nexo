@@ -31,7 +31,7 @@ import { useApp, type CtxView } from "../lib/app";
 import { safetyNumber } from "../lib/identity";
 import { selfId, type Session } from "../lib/session";
 import type { LiveInfo } from "../lib/types";
-import { Avatar, Icons, STATUS_LABEL, lastSeenLabel } from "./common";
+import { Avatar, Icons, NARROW, STATUS_LABEL, lastSeenLabel, useMediaQuery } from "./common";
 import { MembersList } from "./Members";
 import { CTX_TITLES, searchResults, type OpenModal, type SearchItem } from "./Shell";
 import { ThemeEditor } from "./Theme";
@@ -50,10 +50,11 @@ export function ContextPanel({ open }: { open: OpenModal }) {
   const s = a.session;
   const { view, arg } = a.ctx;
   const home = view === "home";
+  const narrow = useMediaQuery(NARROW);
   return (
     <aside className="ctx panel" aria-label="Painel">
       <div className="ctx-head">
-        {!home && (
+        {!home && a.ctxCanGoBack && (
           <button className="ibtn" data-tip="Voltar (Esc)" aria-label="Voltar" onClick={() => a.ctxBack()}>
             <ArrowLeft size={18} weight="bold" />
           </button>
@@ -62,7 +63,7 @@ export function ContextPanel({ open }: { open: OpenModal }) {
           {ICONS[view]}
           {view === "profile" && arg === a.identity.pub ? "Meu perfil" : CTX_TITLES[view]}
         </h3>
-        {home ? (
+        {home && !narrow ? (
           <button className="ibtn" data-tip="Recolher painel" aria-label="Recolher painel" onClick={() => a.toggleCtx()}>
             <SidebarSimple size={18} weight="duotone" />
           </button>

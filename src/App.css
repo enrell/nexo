@@ -102,7 +102,7 @@ kbd { font: 11px var(--font); padding: 1px 6px; border-radius: 5px; background: 
 /* sem z-index nos painéis: assim os menus ancorados (z-index alto) ficam por cima das outras colunas */
 .app > .panel { position: relative; }
 @media (max-width: 1240px) { :root { --left: 232px; --right: 288px; } }
-@media (max-width: 1060px) { .app:not(.theater) { grid-template-areas: "you worlds worlds" "side main main"; grid-template-columns: var(--left) minmax(0, 1fr) 0; } .app > .ctx, .app > .find { display: none; } }
+@media (max-width: 1060px) { .app:not(.theater) { grid-template-areas: "you worlds worlds" "side main main"; grid-template-columns: var(--left) minmax(0, 1fr) 0; } .app > .ctx { display: none; } .app:not(.theater):not(.ctx-search) > .find { position: fixed; top: 0; right: 0; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; } }
 /* abaixo de 1060px o painel da direita some, mas quem pede algo dele (pedidos de entrada, perfil, membros, busca) recebe uma gaveta */
 .ctx-scrim, .narrow-only { display: none; }
 @media (max-width: 1060px) {
@@ -251,7 +251,15 @@ kbd { font: 11px var(--font); padding: 1px 6px; border-radius: 5px; background: 
 .speaking-name { color: var(--text); }
 .voice-icons { margin-left: auto; display: flex; gap: 4px; align-items: center; color: var(--dimmer); }
 .voice-icons .bad { color: var(--bad); }
-.tag-live { background: var(--live); color: #fff; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 5px; }
+.tag-live { background: var(--live); color: #fff; font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 5px; flex: none; border: 0; font-family: inherit; line-height: 1.5; }
+button.tag-live { cursor: pointer; }
+button.tag-live:hover { filter: brightness(1.15); }
+.voice-user .voice-name { flex: 1 1 auto; min-width: 0; }
+.voice-user .voice-icons { margin-left: 0; }
+.live-peek { aspect-ratio: 16 / 9; background: #000; border-radius: 10px; overflow: hidden; display: grid; place-items: center; }
+.live-peek-video { width: 100%; height: 100%; object-fit: contain; }
+.live-peek-info { margin: 10px 0 0; display: flex; align-items: center; gap: 4px; }
+.stage-bar .pill.warn { white-space: nowrap; background: var(--warn, #c98a2b); color: #1a1208; border: 0; cursor: pointer; font: inherit; }
 .dock { margin-top: 8px; padding: 10px; border-radius: 10px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; }
 .dock-st { display: flex; align-items: center; gap: 7px; font-size: 12.5px; min-width: 0; color: var(--ok); }
 .dock-st b { font-weight: 600; flex: none; }
@@ -439,7 +447,11 @@ html.compact .bubble { padding: 6px 12px 7px; }
 .viewers-pop { left: 12px; min-width: 180px; max-height: 60%; overflow-y: auto; }
 .stats-pop { right: 12px; font-family: var(--mono); font-size: 12px; gap: 2px; }
 .viewer-row { display: flex; align-items: center; gap: 8px; }
-.live-chat { width: 330px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--edge); min-height: 0; }
+.live-chat { width: 330px; max-width: 60%; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--edge); min-height: 0; position: relative; }
+.live-chat-resize { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }
+.live-chat-resize:hover, body.resizing .live-chat-resize { background: color-mix(in srgb, var(--a1) 45%, transparent); }
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing video { pointer-events: none; }
 .live-chat-head { padding: 10px 12px; }
 
 /* ---------- painel contextual ---------- */

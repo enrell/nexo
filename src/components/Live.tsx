@@ -3,9 +3,13 @@ import { useApp } from "../lib/app";
 import { selfId, type LiveStats, type Session } from "../lib/session";
 import { storage } from "../lib/storage";
 import { ChatView } from "./Chat";
-import { Avatar, Icons, MediaView } from "./common";
+import { Avatar, Icons, MediaView, Modal } from "./common";
 
 const VOL_KEY = "livevol";
+const CHAT_W_KEY = "livechatw";
+const CHAT_MIN = 260;
+const CHAT_MAX = 720;
+const clampChat = (w: number) => Math.round(Math.min(CHAT_MAX, Math.max(CHAT_MIN, w)));
 
 export function LiveView({ s, origin }: { s: Session; origin: string }) {
   const a = useApp();
@@ -13,6 +17,7 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
   const live = mine ? s.myLive : s.peers[origin]?.live;
   const [volume, setVolume] = useState(() => storage.get<number>(VOL_KEY, 1));
   const [chatOpen, setChatOpen] = useState(true);
+  const [chatW, setChatW] = useState(() => clampChat(storage.get<number>(CHAT_W_KEY, 330)));
   const [showStats, setShowStats] = useState(false);
   const [showViewers, setShowViewers] = useState(false);
   const [stats, setStats] = useState<LiveStats | null>(null);
@@ -38,6 +43,28 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
     storage.set(VOL_KEY, volume);
   }, [volume]);
 
+  // arrastar a borda do chat muda a largura (fica salva); duplo clique volta ao padrão
+  const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const x0 = e.clientX;
+    const w0 = chatW;
+    const handle = e.currentTarget;
+    handle.setPointerCapture(e.pointerId);
+    document.body.classList.add("resizing");
+    let w = w0;
+    const move = (ev: PointerEvent) => setChatW((w = clampChat(w0 + (x0 - ev.clientX))));
+    const up = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", up);
+      handle.removeEventListener("pointercancel", up);
+      document.body.classList.remove("resizing");
+      storage.set(CHAT_W_KEY, w);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", up);
+    handle.addEventListener("pointercancel", up);
+  };
+
   // atalhos: F = tela cheia, T = modo teatro, M = mudo
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -55,6 +82,12 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
   const stream = mine ? s.myStream : (w?.stream ?? null);
   const via = w?.parent && w.parent !== origin ? s.peerName(w.parent) : null;
   const fullscreen = () => (document.fullscreenElement ? document.exitFullscreen() : stageRef.current?.requestFullscreen());
+  // "Tela cheia" na prévia da live
+  useEffect(() => {
+    if (!a.liveFullscreen) return;
+    a.liveFullscreen = false;
+    stageRef.current?.requestFullscreen().catch(() => {});
+  }, [a.liveFullscreen]); // eslint-disable-line react-hooks/exhaustive-deps
   const pip = async () => {
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
@@ -109,7 +142,7 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
               </button>
             </div>
           ) : stream ? (
-            <MediaView stream={stream} muted={mine || a.deafened || volume === 0} volume={volume} className="stage-video" videoRef={videoRef} />
+            <MediaView stream={stream} muted={mine || a.deafened || volume === 0} volume={volume} className="stage-video" videoRef={videoRef} sinkId={a.settings.outputDevice} />
           ) : w?.status === "failed" ? (
             <div className="stage-msg">
               <strong>Não deu pra conectar à live</strong>
@@ -171,6 +204,12 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
                     {volume === 0 ? <Icons.HeadsetOff /> : <Icons.Speaker />}
                   </button>
                   <input type="range" min={0} max={1} step={0.01} value={volume} onChange={(e) => setVolume(+e.target.value)} aria-label="Volume da live" />
+                  {a.deafened && live?.audio && (
+                    <button className="pill warn" onClick={() => a.toggleDeafen()} title="Você está com o som desligado: a live também fica muda">
+                      Som desligado · ligar
+                    </button>
+                  )}
+                  {live && !live.audio && <span className="pill">sem áudio</span>}
                   {via && <span className="pill">via {via} (retransmissão P2P)</span>}
                 </>
               )}
@@ -190,12 +229,84 @@ export function LiveView({ s, origin }: { s: Session; origin: string }) {
           )}
         </div>
         {chatOpen && (
-          <div className="live-chat">
+          <div className="live-chat" style={{ width: chatW }}>
+            <div
+              className="live-chat-resize"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Redimensionar chat"
+              title="Arraste para mudar a largura (duplo clique: padrão)"
+              onPointerDown={startResize}
+              onDoubleClick={() => (setChatW(330), storage.set(CHAT_W_KEY, 330))}
+            />
             <div className="live-chat-head dim small">Chat · #{s.state.channels.find((c) => c.id === a.channelOf(s))?.name}</div>
             <ChatView s={s} compact />
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+/** Prévia da live (ao clicar no "AO VIVO" da sala de voz): vídeo pequeno, sem som, com "Assistir" e "Tela cheia". */
+export function LivePeek({ s, origin, onClose }: { s: Session; origin: string; onClose: () => void }) {
+  const a = useApp();
+  const mine = origin === selfId;
+  const live = mine ? s.myLive : s.peers[origin]?.live;
+  const opening = useRef(false);
+
+  useEffect(() => {
+    if (mine || !live) return;
+    // se a tela principal já mostra outra live, ela volta a ser assistida quando a prévia fechar
+    const before = a.view.type === "live" ? a.view.origin : null;
+    s.watch(origin);
+    return () => {
+      if (opening.current) return;
+      if (before && before !== origin) s.watch(before);
+      else if (!(a.view.type === "live" && a.view.origin === origin)) s.stopWatching();
+    };
+  }, [origin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const w = s.watching?.origin === origin ? s.watching : null;
+  const stream = mine ? s.myStream : (w?.stream ?? null);
+  const name = mine ? "Você" : s.peerName(origin);
+  const open = (fullscreen: boolean) => {
+    opening.current = true;
+    a.openLive(origin, { fullscreen });
+    onClose();
+  };
+
+  return (
+    <Modal
+      title={`${name} · ao vivo`}
+      onClose={onClose}
+      footer={
+        live && (
+          <>
+            <button className="btn ghost" onClick={() => open(true)}>
+              Tela cheia
+            </button>
+            <button className="btn" onClick={() => open(false)}>
+              {mine ? "Ver" : "Assistir"}
+            </button>
+          </>
+        )
+      }
+    >
+      <div className="live-peek">
+        {!live ? (
+          <div className="stage-msg">Essa transmissão acabou.</div>
+        ) : stream ? (
+          <MediaView stream={stream} muted className="live-peek-video" />
+        ) : (
+          <div className="stage-msg">{w?.status === "failed" ? (w.error ?? "Não deu pra conectar à live") : "Conectando…"}</div>
+        )}
+      </div>
+      {live && (
+        <p className="dim small live-peek-info">
+          {live.title} · <Icons.Eye size={13} /> {live.viewers}
+        </p>
+      )}
+    </Modal>
   );
 }

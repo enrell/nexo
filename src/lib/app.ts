@@ -397,7 +397,10 @@ class App {
     return n;
   }
 
-  openLive(origin: string) {
+  /** pedido de tela cheia vindo da prévia da live; a tela da live consome ao montar */
+  liveFullscreen = false;
+  openLive(origin: string, opts: { fullscreen?: boolean } = {}) {
+    this.liveFullscreen = !!opts.fullscreen;
     this.view = { type: "live", origin };
     this.emit();
   }
@@ -427,6 +430,10 @@ class App {
     this.ctxDrawer = true;
     if (this.settings.ctxCollapsed) this.setSettings({ ...this.settings, ctxCollapsed: false });
     this.emit();
+  }
+  /** há uma tela anterior que não é o "Agora" (senão "voltar" faria o mesmo que "fechar") */
+  get ctxCanGoBack() {
+    return this.ctxStack.some((c) => c.view !== "home");
   }
   ctxBack() {
     this.ctx = this.ctxStack.pop() ?? { view: "home" };
