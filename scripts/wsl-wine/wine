@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# "wine" para WSL: o electron-builder chama `wine <programa>.exe` ao gerar o instalador do Windows
+# no Linux; aqui o .exe roda direto no Windows (interop do WSL). Caminhos Linux viram Z:\...
+# (a receita `just dist-win` mapeia Z: para a raiz do WSL).
+prog="$1"; shift
+args=()
+for a in "$@"; do
+  if [[ "$a" == /* && -e "$a" ]]; then p="${a//\//\\}"; args+=("Z:$p")
+  elif [[ "$a" == *=/* && -e "${a#*=}" ]]; then p="${a#*=}"; args+=("${a%%=*}=Z:${p//\//\\}")
+  else args+=("$a"); fi
+done
+# o interop só executa arquivos com permissão de execução
+[[ "$prog" == *.exe ]] && chmod +x "$prog"
+exec "$prog" "${args[@]}"
