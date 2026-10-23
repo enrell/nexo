@@ -6,6 +6,8 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+## [0.4.0] - 2026-10-23
+
 ### Segurança
 - A CSP do app passou a liberar `'wasm-unsafe-eval'` (só compilar WebAssembly, para o redutor de ruído); `eval` e scripts inline continuam bloqueados.
 - Atualização automática verificada pela chave do projeto (Ed25519), já que o instalador não tem a assinatura da Microsoft: o CI assina versão + SHA-512 do instalador no `latest.yml` e o app recusa o que não confere, antes de rodar o instalador. O workflow de release falha se o segredo `UPDATE_SIGNING_KEY` faltar ou for de outra chave.
@@ -22,6 +24,8 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 - Suíte de testes unitários (Vitest, ~400 testes) com cobertura mínima no CI, verificação de mutação (`npm run test:mutation`) e `ErrorBoundary`: um erro ao desenhar uma conversa mostra um aviso com "Tentar de novo" em vez de derrubar o app.
 
 ### Corrigido
+- Live de câmera não cai mais à toa quando a câmera falha por um instante: o app tenta reabrir por alguns segundos e, se a câmera escolhida sumiu, usa outra.
+- Ctrl+K funciona também em janelas estreitas (a busca abre na gaveta).
 - Em janelas com menos de 1060 px de largura o painel da direita sumia, e com ele os pedidos de entrada: um admin numa tela pequena não conseguia aprovar ninguém ("Ver pedidos" não fazia nada). Agora o painel abre como gaveta por cima do chat, e um botão no topo do canal mostra o "Agora".
 - Negrito com itálico dentro (`**negrito *itálico* dentro**`) saía com asteriscos soltos.
 - Extração de prévias de links ignorava `<META>` em maiúsculas e entidades numéricas (`&#233;`).
@@ -84,5 +88,6 @@ Primeira versão pública. Tudo criptografado e seguro por padrão.
 ### Adicionado
 - Demonstração inicial: chat, voz e live P2P com interface parecida com a do Discord.
 
-[Não lançado]: https://github.com/enrell/nexo/compare/v0.3.0...HEAD
+[Não lançado]: https://github.com/enrell/nexo/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/enrell/nexo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/enrell/nexo/releases/tag/v0.3.0
