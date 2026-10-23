@@ -128,6 +128,9 @@ export function ChatView({ s, compact }: { s: Session; compact?: boolean }) {
           <button className={"ibtn" + (a.ctx.view === "members" && !a.settings.ctxCollapsed ? " on" : "")} data-tip="Membros" aria-label="Membros" onClick={() => a.toggleMembers()}>
             <Icons.Users />
           </button>
+          <button className={"ibtn narrow-only" + (a.ctxDrawer ? " on" : "")} data-tip="Painel" aria-label="Painel" onClick={() => a.toggleDrawer()}>
+            <SidebarSimple size={19} weight="duotone" />
+          </button>
           {a.settings.ctxCollapsed && (
             <button className="ibtn" data-tip="Mostrar painel" aria-label="Mostrar painel" onClick={() => a.toggleCtx()}>
               <SidebarSimple size={19} weight="duotone" />

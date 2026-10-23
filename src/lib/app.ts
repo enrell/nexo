@@ -31,6 +31,10 @@ class App {
   view: View = { type: "chat" };
   theater = false;
   ctx: CtxState = { view: "home" };
+  /** janela estreita (< 1060px): o painel da direita só aparece como gaveta, e só enquanto isto for true */
+  ctxDrawer = false;
+  /** a gaveta abriu sozinha (alguém pediu um perfil, os pedidos...): ao voltar para o "Agora", ela fecha */
+  private drawerAuto = false;
   private ctxStack: CtxState[] = [];
   /** texto da busca global (topo à direita) e item selecionado nos resultados */
   search = "";
@@ -419,19 +423,32 @@ class App {
     this.ctxStack.push(this.ctx);
     if (this.ctxStack.length > 20) this.ctxStack.shift();
     this.ctx = { view, arg };
+    if (!this.ctxDrawer) this.drawerAuto = true;
+    this.ctxDrawer = true;
     if (this.settings.ctxCollapsed) this.setSettings({ ...this.settings, ctxCollapsed: false });
     this.emit();
   }
   ctxBack() {
     this.ctx = this.ctxStack.pop() ?? { view: "home" };
+    if (this.ctx.view === "home" && this.drawerAuto) this.ctxDrawer = false;
     if (this.ctx.view !== "search") this.search = "";
     this.emit();
   }
   ctxHome(emit = true) {
+    this.ctxDrawer = false;
+    this.drawerAuto = false;
     this.ctxStack = [];
     this.ctx = { view: "home" };
     this.search = "";
     if (emit) this.emit();
+  }
+  /** só em janela estreita: abre/fecha a gaveta com o painel "Agora" */
+  toggleDrawer() {
+    if (this.ctxDrawer) return this.ctxHome();
+    this.ctxDrawer = true;
+    this.drawerAuto = false;
+    if (this.settings.ctxCollapsed) this.setSettings({ ...this.settings, ctxCollapsed: false });
+    this.emit();
   }
   toggleCtx() {
     this.setSettings({ ...this.settings, ctxCollapsed: !this.settings.ctxCollapsed });

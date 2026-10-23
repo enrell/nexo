@@ -102,7 +102,10 @@ try {
     const leaked = await B.ev(() => window.__nexo.session.events.size);
     if (leaked > 0) throw new Error("pendente recebeu " + leaked + " eventos antes da aprovação");
     await A.page.locator(".banner.warn").waitFor({ timeout: 15000 });
+    // como uma pessoa faria; também prova que funciona em janela estreita (o runner tem tela de 1024px)
+    await A.page.locator(".banner.warn").getByRole("button", { name: "Ver pedidos" }).click();
     await A.page.locator(".member.pending").getByRole("button", { name: "Aprovar" }).click();
+    await A.page.keyboard.press("Escape");
   });
 
   await step("aprovado: handshake assinado, histórico sincroniza", async () => {
@@ -159,7 +162,9 @@ try {
   await step("terceiro membro chega depois, é aprovado e recebe o histórico completo", async () => {
     await joinWithCode(C, code);
     await C.page.getByText("Aguardando aprovação").waitFor({ timeout: 60000 });
+    await A.page.locator(".banner.warn").getByRole("button", { name: "Ver pedidos" }).click();
     await A.page.locator(".member.pending").getByRole("button", { name: "Aprovar" }).click();
+    await A.page.keyboard.press("Escape");
     await wait(C, () => Object.values(window.__nexo.session?.peers ?? {}).filter((p) => p.profile).length >= 2, null, 60000);
     await wait(B, () => Object.values(window.__nexo.session?.peers ?? {}).filter((p) => p.profile).length >= 2, null, 60000);
     const countA = await sessionEval(A, (s) => s.events.size);
@@ -193,7 +198,7 @@ try {
     await A.page.getByRole("button", { name: "Ficar ao vivo" }).click();
     await A.page.locator(".stage-video").waitFor({ timeout: 15000 });
     for (const P of [B, C]) {
-      await P.page.locator(".chan.live").first().click({ timeout: 15000 });
+      await P.page.locator(".livecap button", { hasText: "Assistir" }).click({ timeout: 15000 }); // existe em qualquer largura
       await P.page.waitForTimeout(2500);
     }
     for (const P of [B, C]) await wait(P, () => (document.querySelector(".stage-video")?.videoWidth ?? 0) > 0, null, 30000);

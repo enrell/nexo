@@ -33,9 +33,9 @@ export default function App() {
         if (next) a.selectServer(next.roomId);
       }
       // Esc volta o painel da direita (quando nada mais está aberto)
-      if (e.key === "Escape" && !e.defaultPrevented && a.ctx.view !== "home" && !document.querySelector(".modal-backdrop, .fullscreen-settings, .lightbox, .menu.ctx")) {
+      if (e.key === "Escape" && !e.defaultPrevented && (a.ctx.view !== "home" || a.ctxDrawer) && !document.querySelector(".modal-backdrop, .fullscreen-settings, .lightbox, .menu.ctx")) {
         const t = e.target as HTMLElement;
-        if (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") a.ctxBack();
+        if (t.tagName !== "INPUT" && t.tagName !== "TEXTAREA") (a.ctx.view === "home" ? a.ctxHome() : a.ctxBack());
       }
     };
     window.addEventListener("keydown", onKey);
@@ -50,7 +50,7 @@ export default function App() {
   const collapsed = a.settings.ctxCollapsed;
 
   return (
-    <div className={"app" + (theater ? " theater" : "") + (collapsed ? " ctx-collapsed" : "")}>
+    <div className={"app" + (theater ? " theater" : "") + (collapsed ? " ctx-collapsed" : "") + (a.ctxDrawer ? " ctx-open" : "")}>
       {!theater && <YouPanel open={setModal} />}
       {!theater && <Worlds open={setModal} />}
       {!theater && <FindPanel />}
@@ -61,6 +61,8 @@ export default function App() {
         </ErrorBoundary>
       </main>
       {!theater && !collapsed && <ContextPanel open={setModal} />}
+      {/* janela estreita: o painel vira gaveta por cima e isto fecha ao clicar fora (no CSS só aparece abaixo de 1060px) */}
+      {!theater && !collapsed && a.ctxDrawer && <div className="ctx-scrim" onClick={() => a.ctxHome()} />}
 
       {(modal === "add" || modal === "join") && <AddServerModal initialTab={modal === "join" ? "join" : "create"} onClose={close} />}
       {modal === "invite" && s && <InviteModal s={s} onClose={close} />}

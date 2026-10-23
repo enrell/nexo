@@ -22,6 +22,7 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 - Suíte de testes unitários (Vitest, ~400 testes) com cobertura mínima no CI, verificação de mutação (`npm run test:mutation`) e `ErrorBoundary`: um erro ao desenhar uma conversa mostra um aviso com "Tentar de novo" em vez de derrubar o app.
 
 ### Corrigido
+- Em janelas com menos de 1060 px de largura o painel da direita sumia, e com ele os pedidos de entrada: um admin numa tela pequena não conseguia aprovar ninguém ("Ver pedidos" não fazia nada). Agora o painel abre como gaveta por cima do chat, e um botão no topo do canal mostra o "Agora".
 - Negrito com itálico dentro (`**negrito *itálico* dentro**`) saía com asteriscos soltos.
 - Extração de prévias de links ignorava `<META>` em maiúsculas e entidades numéricas (`&#233;`).
 

@@ -103,6 +103,13 @@ kbd { font: 11px var(--font); padding: 1px 6px; border-radius: 5px; background: 
 .app > .panel { position: relative; }
 @media (max-width: 1240px) { :root { --left: 232px; --right: 288px; } }
 @media (max-width: 1060px) { .app:not(.theater) { grid-template-areas: "you worlds worlds" "side main main"; grid-template-columns: var(--left) minmax(0, 1fr) 0; } .app > .ctx, .app > .find { display: none; } }
+/* abaixo de 1060px o painel da direita some, mas quem pede algo dele (pedidos de entrada, perfil, membros, busca) recebe uma gaveta */
+.ctx-scrim, .narrow-only { display: none; }
+@media (max-width: 1060px) {
+  .app.ctx-open:not(.theater) > .ctx { display: flex; position: fixed; top: 0; right: 0; bottom: 0; width: min(340px, 92vw); z-index: 80; background: var(--rail); border-left: 1px solid var(--edge); box-shadow: -12px 0 32px rgb(0 0 0 / 0.35); }
+  .narrow-only { display: inline-flex; }
+  .app.ctx-open:not(.theater) > .ctx-scrim { display: block; position: fixed; inset: 0; z-index: 79; background: rgb(0 0 0 / 0.35); }
+}
 
 /* colunas coladas, separadas só pelo tom: lateral e painel direito no tom base, centro um degrau acima */
 .panel { background: var(--rail); min-width: 0; min-height: 0; }
