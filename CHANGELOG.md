@@ -6,6 +6,8 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+## [0.5.0] - 2026-10-23
+
 ### Adicionado
 - Clicar no "AO VIVO" de alguém na sala de voz abre uma prévia da live, com "Assistir" e "Tela cheia".
 - A largura do chat ao lado da live pode ser ajustada arrastando a borda (duplo clique volta ao padrão).
@@ -98,6 +100,7 @@ Primeira versão pública. Tudo criptografado e seguro por padrão.
 ### Adicionado
 - Demonstração inicial: chat, voz e live P2P com interface parecida com a do Discord.
 
-[Não lançado]: https://github.com/enrell/nexo/compare/v0.4.0...HEAD
+[Não lançado]: https://github.com/enrell/nexo/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/enrell/nexo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/enrell/nexo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/enrell/nexo/releases/tag/v0.3.0
