@@ -6,6 +6,8 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+## [0.8.0] - 2026-10-26
+
 ### Adicionado
 - TURN da Cloudflare integrado (grátis até 1 TB/mês): em Configurações → Rede, cole a Turn Token ID e o API token e pronto. Resolve CGNAT dos dois lados. As credenciais renovam sozinhas, e quem é dono ou admin repassa acesso temporário aos membros automaticamente (nunca o token).
 
@@ -126,7 +128,8 @@ Primeira versão pública. Tudo criptografado e seguro por padrão.
 ### Adicionado
 - Demonstração inicial: chat, voz e live P2P com interface parecida com a do Discord.
 
-[Não lançado]: https://github.com/enrell/nexo/compare/v0.7.0...HEAD
+[Não lançado]: https://github.com/enrell/nexo/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/enrell/nexo/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/enrell/nexo/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/enrell/nexo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/enrell/nexo/compare/v0.4.0...v0.5.0

@@ -1,7 +1,7 @@
 {
   "name": "nexo",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.8.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n vite,electron \"vite\" \"wait-on tcp:1420 && cross-env NEXO_DEV=1 electron .\"",
