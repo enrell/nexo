@@ -40,6 +40,7 @@ Só a **última versão** recebe correções de segurança. O app se atualiza so
 | Binário adulterado | **Electron fuses**: `RunAsNode` e `NODE_OPTIONS` desligados, inspeção por linha de comando desligada, integridade do `app.asar` validada, só carrega o app de dentro do asar, `file://` sem privilégios extras. DevTools desligado na versão instalada. |
 | Atualização maliciosa | Atualizações só por HTTPS do GitHub Releases, conferidas pelo **SHA-512** do `latest.yml` **e por uma assinatura Ed25519 do projeto** (versão + SHA-512 do instalador), verificada pelo app antes de instalar, sem downgrade. A chave privada existe só como segredo do workflow de release: quem trocar os arquivos da release (ex.: token do GitHub vazado) não consegue produzir uma atualização que o app aceite. Cada instalador também tem **atestado de procedência** (GitHub Artifact Attestations) e o `SHA256SUMS` publicado na release. |
 | SSRF pela prévia de links | Prévias são **opt-in** (desligadas por padrão). Quando ligadas: só `https`, sem IP literal nem porta, DNS resolvido e **IPs privados/loopback/link-local recusados no momento da conexão** (anti DNS-rebinding), até 3 redirecionamentos, 512 KB e 6 s. |
+| Portas abertas no roteador (UPnP/NAT-PMP) | Só UDP, só para o próprio PC (o roteador recebe o IP local da interface do gateway; outro IP é recusado), só para portas que o WebRTC acabou de abrir, no máximo 64 por vez, concessão de 30 min renovada enquanto a conexão existe, removidas ao fechar a conexão e ao sair do app. Atrás dessas portas só existe o WebRTC: sem a credencial ICE da sessão e o DTLS com o certificado assinado, o pacote é descartado. As respostas do roteador são tratadas como entrada hostil: SSDP só do gateway, descrição e SOAP só por HTTP no próprio gateway, sem redirecionamento, 256 KB e 3 s. Desligável em Configurações → Rede. |
 | Arquivos executáveis recebidos | Aviso antes de salvar `.exe`, `.bat`, `.ps1`, `.lnk`, `.msi`, `.js` e outros tipos perigosos. Anexos são conferidos pelo hash. |
 
 ### Padrões conservadores (o que vaza só se você ligar)
@@ -51,10 +52,11 @@ Só a **última versão** recebe correções de segurança. O app se atualiza so
 | Texto da mensagem nas notificações | **desligado** | Notificações ficam no histórico do Windows. |
 | Aprovação de novos membros | **ligada** em servidores novos | Convite vazado não basta para entrar. |
 | Esconder IP (só TURN) | desligado | Exige um servidor TURN seu. |
+| Abrir portas no roteador (UPnP/NAT-PMP) | **ligado** | Sem isso, amigos atrás de CGNAT não conectam em você. Com *Esconder meu IP* ligado, nada é aberto (só TURN). |
 
 ### O que o Nexo **não** protege (limitações conhecidas)
 
-- **Seu IP é visível para quem está conectado com você.** É uma consequência do P2P. Para esconder, configure um TURN e ligue *Esconder meu IP*. Os relays Nostr também veem o IP de quem procura uma sala (não o conteúdo).
+- **Seu IP é visível para quem está conectado com você**, incluindo o IP da rede local e o endereço IPv6 (os candidatos ICE vão com o endereço real, não com nomes mDNS, porque no IPv6 é ele que conecta direto). É uma consequência do P2P. Para esconder, configure um TURN e ligue *Esconder meu IP*. Os relays Nostr também veem o IP de quem procura uma sala (não o conteúdo).
 - **Metadados para os relays**: eles sabem que alguém do seu IP está procurando uma sala (identificada por hash), e quando.
 - **Membros são confiáveis com o que recebem**: quem foi aprovado vê e guarda o histórico. Um espectador que retransmite uma live recebe o vídeo decifrado (é como funciona a retransmissão). Ninguém de fora vê.
 - **Um PC comprometido** (malware rodando na sua conta) consegue o que você consegue: o DPAPI protege contra cópia dos arquivos, não contra código rodando como você.

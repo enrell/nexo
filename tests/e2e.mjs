@@ -199,6 +199,15 @@ try {
     if (seenByA || mPeers > 0) throw new Error(`conexão aceita (A vê Mallory: ${seenByA}, Mallory vê ${mPeers})`);
   });
 
+  await step("candidatos ICE locais com endereço real, não mDNS (IPv6 direto passa pelo CGNAT)", async () => {
+    const sdps = await sessionEval(A, (s) => Object.values(s.room.getPeers()).map((pc) => pc.localDescription?.sdp ?? ""));
+    const hosts = sdps.join("\n").split("\n").filter((l) => l.startsWith("a=candidate") && / typ host/.test(l));
+    if (!hosts.length) throw new Error("nenhum candidato host");
+    const mdns = hosts.filter((l) => /\.local /.test(l));
+    if (mdns.length) throw new Error("candidatos ainda escondidos por mDNS: " + mdns[0]);
+    log("   v6 host:", hosts.filter((l) => / [0-9a-f]*:[0-9a-f:]+ \d+ typ host/i.test(l)).length, "de", hosts.length);
+  });
+
   await step("voz entre três pessoas (microfone falso)", async () => {
     for (const P of [A, B, C]) await P.page.locator(".chan", { hasText: "Sala de voz" }).click();
     for (const P of [A, B, C]) await wait(P, () => window.__nexo.session.voicePeers.size === 2, null, 20000);

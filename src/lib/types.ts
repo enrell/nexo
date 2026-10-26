@@ -63,6 +63,8 @@ export type Settings = {
   turnUser: string;
   turnPass: string;
   relayUrls: string; // um por linha; vazio = padrão
+  /** abrir portas no roteador (UPnP/NAT-PMP) para amigos atrás de CGNAT chegarem direto */
+  portMap: boolean;
   // sistema
   closeToTray: boolean;
   launchAtLogin: boolean;
@@ -142,6 +144,8 @@ export type PeerInfo = {
   deaf?: boolean;
   rtt?: number;
   relayed?: boolean;
+  /** conexão direta por IPv6 (passa por cima do CGNAT, que só existe no IPv4) */
+  ipv6?: boolean;
 };
 
 export type WatchState = {

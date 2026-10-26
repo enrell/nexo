@@ -43,12 +43,30 @@ export function remoteFingerprint(pc: RTCPeerConnection): string | null {
 }
 
 /**
+ * Candidato "endereço externo do roteador" para um candidato host IPv4 cuja porta foi aberta via
+ * UPnP/NAT-PMP. Vira srflx (como o que o STUN descobriria), com prioridade de srflx.
+ */
+export function mappedCandidate(host: string, ext: { ip: string; port: number }): string | null {
+  const f = host.replace(/^a=/, "").trim().split(/\s+/);
+  // candidate:<fundação> <componente> udp <prioridade> <ip> <porta> typ host ...
+  if (f.length < 8 || !f[0].startsWith("candidate:") || f[2].toLowerCase() !== "udp" || f[6] !== "typ" || f[7] !== "host") return null;
+  const comp = Number(f[1]);
+  if (!Number.isInteger(comp) || comp < 1 || comp > 256) return null;
+  const ufrag = f.indexOf("ufrag");
+  const priority = 100 * 2 ** 24 + 65535 * 2 ** 8 + (256 - comp);
+  return `candidate:nexo${ext.port} ${comp} udp ${priority} ${ext.ip} ${ext.port} typ srflx raddr ${f[4]} rport ${f[5]} generation 0${ufrag > 0 && f[ufrag + 1] ? " ufrag " + f[ufrag + 1] : ""}`;
+}
+
+/**
  * RTCPeerConnection do Nexo: aplica o certificado fixo, a política de ICE
  * (só TURN, para esconder o IP, se o usuário pedir) e a preferência de codec.
  * "auto" prefere H.264 (normalmente codificado pela placa de vídeo).
  */
-export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolean): typeof RTCPeerConnection {
+export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolean, usePortMap: () => boolean = () => false): typeof RTCPeerConnection {
   return class NexoPeerConnection extends RTCPeerConnection {
+    private mappedPorts = new Set<number>();
+    private synthetic = new WeakSet<RTCIceCandidate>();
+
     constructor(config?: RTCConfiguration) {
       super({
         ...config,
@@ -57,6 +75,34 @@ export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolea
         bundlePolicy: "max-bundle",
         rtcpMuxPolicy: "require",
       });
+      // porta aberta no roteador (UPnP/NAT-PMP): anuncia também "IP externo:porta" para quem está
+      // atrás de CGNAT conseguir chegar direto em nós
+      if (!relayOnly) this.addEventListener("icecandidate", (ev) => void this.announceMapped(ev.candidate));
+      this.addEventListener("connectionstatechange", () => this.connectionState === "closed" && this.releasePorts());
+    }
+
+    private async announceMapped(c: RTCIceCandidate | null) {
+      const api = window.nexo;
+      if (!c || this.synthetic.has(c) || c.type !== "host" || c.protocol !== "udp" || !c.address || c.address.includes(":") || !c.port || !api?.portMap || !usePortMap()) return;
+      const ext = await api.portMap(c.address, c.port).catch(() => null);
+      if (!ext) return;
+      this.mappedPorts.add(c.port);
+      if (this.connectionState === "closed") return this.releasePorts();
+      const line = mappedCandidate(c.candidate, ext);
+      if (!line) return;
+      const cand = new RTCIceCandidate({ candidate: line, sdpMid: c.sdpMid, sdpMLineIndex: c.sdpMLineIndex, usernameFragment: c.usernameFragment });
+      this.synthetic.add(cand);
+      this.dispatchEvent(new RTCPeerConnectionIceEvent("icecandidate", { candidate: cand }));
+    }
+
+    private releasePorts() {
+      for (const p of this.mappedPorts) void window.nexo?.portMapRelease(p).catch(() => {});
+      this.mappedPorts.clear();
+    }
+
+    close() {
+      this.releasePorts();
+      super.close();
     }
 
     addTrack(track: MediaStreamTrack, ...streams: MediaStream[]): RTCRtpSender {

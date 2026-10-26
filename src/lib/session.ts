@@ -137,7 +137,7 @@ export class Session {
         password: server.password,
         turnConfig,
         relayConfig: urls.length ? { urls } : { redundancy: 6 },
-        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && !!turnConfig),
+        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && !!turnConfig, () => ctx.settings().portMap),
         maxReceiveBytes: 32 * 1024 * 1024,
       },
       server.roomId,
@@ -531,7 +531,9 @@ export class Session {
           const stats = await pcs[id].getStats();
           stats.forEach((r) => {
             if (r.type === "candidate-pair" && r.nominated && r.state === "succeeded") {
-              p.relayed = stats.get(r.localCandidateId)?.candidateType === "relay";
+              const local = stats.get(r.localCandidateId);
+              p.relayed = local?.candidateType === "relay";
+              p.ipv6 = String(local?.address ?? local?.ip ?? "").includes(":");
             }
           });
         }

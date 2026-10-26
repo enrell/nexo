@@ -725,11 +725,20 @@ function NetworkSection() {
             <div key={p.pub} className="conn-row small">
               <span className="ellipsis">{p.profile?.name ?? "…"}</span>
               <span className={"conn " + ((p.rtt ?? 999) < 80 ? "good" : (p.rtt ?? 999) < 200 ? "ok" : "bad")}>{p.rtt ?? "?"} ms</span>
-              <span className="dim">{p.relayed === undefined ? "" : p.relayed ? "via TURN" : "direta"}</span>
+              <span className="dim">{p.relayed === undefined ? "" : p.relayed ? "via TURN" : p.ipv6 ? "direta (IPv6)" : "direta"}</span>
             </div>
           ))}
         </div>
       ))}
+
+      <h3>Roteador</h3>
+      <Toggle
+        label="Abrir portas no roteador automaticamente (UPnP/NAT-PMP)"
+        hint="Como o qBittorrent: amigos atrás de CGNAT conseguem conectar direto em você. Precisa do UPnP ligado no roteador."
+        checked={st.portMap}
+        onChange={(v) => set({ portMap: v })}
+      />
+      {st.portMap && <PortMapStatus />}
 
       <h3>TURN (avançado)</h3>
       <p className="dim small">Se algum amigo nunca conecta (NAT restritivo, alguns 4G/CGNAT), um servidor TURN repassa o tráfego. Um amigo pode hospedar um coturn, ou use um serviço gratuito.</p>
@@ -769,6 +778,31 @@ function NetworkSection() {
       </button>
     </>
   );
+}
+
+function PortMapStatus() {
+  const [pm, setPm] = useState<NexoPortMapStatus | null>(null);
+  useEffect(() => {
+    if (!window.nexo?.portMapStatus) return;
+    let alive = true;
+    const load = () => void window.nexo!.portMapStatus().then((v) => alive && setPm(v));
+    load();
+    const t = window.setInterval(load, 3000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
+  if (!pm) return null;
+  const text = {
+    off: "Ainda não foi preciso: o roteador é consultado na primeira conexão.",
+    searching: "Procurando o roteador…",
+    upnp: `Funcionando via UPnP. IP externo ${pm.externalIp}, ${pm.mapped ?? 0} porta(s) aberta(s) agora.`,
+    natpmp: `Funcionando via NAT-PMP. IP externo ${pm.externalIp}, ${pm.mapped ?? 0} porta(s) aberta(s) agora.`,
+    cgnat: `O roteador respondeu, mas o IP externo dele (${pm.externalIp ?? "?"}) é de CGNAT: abrir porta não adianta. Peça um IPv4 público à operadora, use IPv6 ou um TURN.`,
+    none: "O roteador não respondeu a UPnP nem a NAT-PMP. Ligue o UPnP nas configurações do roteador.",
+  }[pm.state];
+  return <p className={"small " + (pm.state === "upnp" || pm.state === "natpmp" ? "" : "dim")}>{text}</p>;
 }
 
 function AboutSection() {

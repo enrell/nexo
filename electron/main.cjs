@@ -5,6 +5,7 @@ const https = require("node:https");
 const net = require("node:net");
 const path = require("node:path");
 const { safeLookup } = require("./netguard.cjs");
+const { createPortMapper } = require("./portmap.cjs");
 const { parsePreview } = require("./preview.cjs");
 const { setupUpdater } = require("./updater.cjs");
 
@@ -21,6 +22,11 @@ protocol.registerSchemesAsPrivileged([{ scheme: APP_SCHEME, privileges: { standa
 
 if (process.platform === "win32") app.setAppUserModelId("com.nexo.app");
 
+// WebRTC: mostrar os endereços locais de verdade nos candidatos ICE em vez de nomes mDNS (xxxx.local).
+// Com IPv6 não há NAT: o endereço local É o público, e é ele que conecta direto mesmo com CGNAT no IPv4.
+// Um nome .local não resolve pela internet. Quem liga "Esconder meu IP" usa só TURN e não manda candidato local.
+app.commandLine.appendSwitch("disable-features", "WebRtcHideLocalIpsWithMdns");
+
 // links nexo://join/... abrem o app (só o app instalado se registra; o instalador também registra)
 if (app.isPackaged) app.setAsDefaultProtocolClient("nexo");
 
@@ -32,6 +38,7 @@ if (!multiInstance && !app.requestSingleInstanceLock()) {
 }
 
 let win = null;
+const portMapper = createPortMapper();
 let tray = null;
 let quitting = false;
 let pendingUrl = process.argv.find((a) => a.startsWith("nexo://")) ?? null;
@@ -387,6 +394,9 @@ app.whenReady().then(() => {
   handle("nexo:idle", () => powerMonitor.getSystemIdleTime());
   handle("nexo:version", () => app.getVersion());
   handle("nexo:preview", (url) => fetchPreview(url));
+  handle("nexo:portmap", (ip, port) => portMapper.map(String(ip), Number(port)));
+  handle("nexo:portmap-release", (port) => portMapper.release(Number(port)));
+  handle("nexo:portmap-status", () => portMapper.status());
   ipcMain.on("nexo:debug", (e) => {
     // ganchos de teste/depuração só fora do app instalado
     e.returnValue = trusted(e) && !app.isPackaged;
@@ -422,8 +432,16 @@ app.whenReady().then(() => {
   app.on("activate", showWindow);
 });
 
-app.on("before-quit", () => {
+let portsReleased = false;
+app.on("before-quit", (e) => {
   quitting = true;
+  // tira as portas abertas no roteador antes de sair (no máximo ~1,5 s)
+  if (!portsReleased) {
+    e.preventDefault();
+    portsReleased = true;
+    void portMapper.releaseAll().finally(() => app.quit());
+    return;
+  }
   globalShortcut.unregisterAll();
   try {
     hook?.uIOhook.stop();

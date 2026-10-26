@@ -110,6 +110,7 @@ export const defaultSettings: Settings = {
   turnUser: "",
   turnPass: "",
   relayUrls: "",
+  portMap: true,
   closeToTray: true,
   launchAtLogin: false,
   // seguro por padrão: nada que vaze seu IP para sites de terceiros sem você pedir
