@@ -62,14 +62,35 @@ export function mappedCandidate(host: string, ext: { ip: string; port: number })
  * (só TURN, para esconder o IP, se o usuário pedir) e a preferência de codec.
  * "auto" prefere H.264 (normalmente codificado pela placa de vídeo).
  */
-export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolean, usePortMap: () => boolean = () => false): typeof RTCPeerConnection {
+/** Conexões abertas, para trocar as credenciais do TURN quando renovam (elas valem no máximo 48 h). */
+const livePcs = new Set<RTCPeerConnection & { baseIce: RTCIceServer[] }>();
+
+/** Aplica servidores TURN novos (renovados) nas conexões já abertas. */
+export function refreshExtraIce(extra: RTCIceServer[]) {
+  for (const pc of livePcs) {
+    if (pc.connectionState === "closed") {
+      livePcs.delete(pc);
+      continue;
+    }
+    try {
+      pc.setConfiguration({ ...pc.getConfiguration(), iceServers: [...pc.baseIce, ...extra] });
+    } catch (e) {
+      console.warn("setConfiguration", e);
+    }
+  }
+}
+
+export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolean, usePortMap: () => boolean = () => false, extraIce: () => RTCIceServer[] = () => []): typeof RTCPeerConnection {
   return class NexoPeerConnection extends RTCPeerConnection {
     private mappedPorts = new Set<number>();
     private synthetic = new WeakSet<RTCIceCandidate>();
+    baseIce: RTCIceServer[];
 
     constructor(config?: RTCConfiguration) {
       super({
         ...config,
+        // TURN da Cloudflare (seu ou repassado por um admin), além do que veio do Trystero
+        iceServers: [...(config?.iceServers ?? []), ...extraIce()],
         certificates: certificate ? [certificate] : config?.certificates,
         iceTransportPolicy: relayOnly ? "relay" : config?.iceTransportPolicy,
         bundlePolicy: "max-bundle",
@@ -78,7 +99,14 @@ export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolea
       // porta aberta no roteador (UPnP/NAT-PMP): anuncia também "IP externo:porta" para quem está
       // atrás de CGNAT conseguir chegar direto em nós
       if (!relayOnly) this.addEventListener("icecandidate", (ev) => void this.announceMapped(ev.candidate));
-      this.addEventListener("connectionstatechange", () => this.connectionState === "closed" && this.releasePorts());
+      this.addEventListener("connectionstatechange", () => this.connectionState === "closed" && this.forget());
+      this.baseIce = config?.iceServers ?? [];
+      livePcs.add(this);
+    }
+
+    private forget() {
+      this.releasePorts();
+      livePcs.delete(this);
     }
 
     private async announceMapped(c: RTCIceCandidate | null) {
@@ -101,7 +129,7 @@ export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolea
     }
 
     close() {
-      this.releasePorts();
+      this.forget();
       super.close();
     }
 

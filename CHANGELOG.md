@@ -6,6 +6,9 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+### Adicionado
+- TURN da Cloudflare integrado (grátis até 1 TB/mês): em Configurações → Rede, cole a Turn Token ID e o API token e pronto. Resolve CGNAT dos dois lados. As credenciais renovam sozinhas, e quem é dono ou admin repassa acesso temporário aos membros automaticamente (nunca o token).
+
 ## [0.7.0] - 2026-10-26
 
 ### Adicionado

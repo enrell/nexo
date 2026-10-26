@@ -18,7 +18,7 @@ import { canonical, GOVERNANCE, MAX_FUTURE_MS, validateBody, verifyEvent } from 
 import { isPubKey, sha256, verify, type Identity } from "./identity";
 import { sanitizeLive, sanitizePatch, sanitizeProfile, sanitizeThumb, type PresencePatch } from "./sanitize";
 import { makePeerConnectionClass, myFingerprint, remoteFingerprint } from "./rtc";
-import { buildTurnConfig, joinErrorMessage } from "./turn";
+import { buildTurnConfig, joinErrorMessage, sanitizeSharedTurn, type SharedTurn } from "./turn";
 import { randomId } from "./storage";
 import type { Attachment, EventBody, LiveInfo, Member, MsgView, PeerInfo, Profile, ServerInfo, Settings, SignedEvent, StoredEvent, WatchState } from "./types";
 
@@ -61,6 +61,11 @@ export type SessionCtx = {
   onPeerEvent: (session: Session, kind: "voice-join" | "voice-leave" | "live-start" | "viewer-join" | "knock" | "approved" | "live-end", peerId: string) => void;
   onMove: (session: Session, roomId: string, password: string) => void;
   saveServers: () => void;
+  /** TURN da Cloudflare em uso (seu ou repassado) */
+  extraIce: () => RTCIceServer[];
+  /** credenciais temporárias para repassar aos membros (só se você gerou e quer compartilhar) */
+  turnToShare: () => SharedTurn | null;
+  onSharedTurn: (session: Session, fromName: string, t: SharedTurn) => void;
 };
 
 type Hello = { profile: Profile; live: LiveInfo | null; inVoice: boolean; muted: boolean; deaf: boolean; thumb?: string };
@@ -137,7 +142,7 @@ export class Session {
         password: server.password,
         turnConfig,
         relayConfig: urls.length ? { urls } : { redundancy: 6 },
-        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && !!turnConfig, () => ctx.settings().portMap),
+        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && (!!turnConfig || !!s.cfTurnKeyId), () => ctx.settings().portMap, ctx.extraIce),
         maxReceiveBytes: 32 * 1024 * 1024,
       },
       server.roomId,
@@ -188,6 +193,14 @@ export class Session {
       if (this.awaitingApproval) this.synced.clear();
       ctx.emit();
     };
+    // TURN repassado: só vale de quem administra o servidor, e só turn.cloudflare.com
+    this.act.turn.onMessage = (raw: unknown, { peerId }) => {
+      if (!this.allow(peerId, "small", true)) return;
+      const p = this.peers[peerId];
+      if (!p || !this.isMember() || !this.isAdmin(p.pub)) return;
+      const t = sanitizeSharedTurn(raw);
+      if (t) ctx.onSharedTurn(this, this.profileOf(p.pub).name, t);
+    };
     this.act.leaveTree.onMessage = (_: unknown, { peerId }) => {
       if (this.allow(peerId, "small", true)) void this.onLeaveTree(peerId);
     };
@@ -215,6 +228,7 @@ export class Session {
       have: r.makeAction<any>("have"),
       typing: r.makeAction<any>("typing"),
       gate: r.makeAction<any>("gate"),
+      turn: r.makeAction<any>("turn"),
       leaveTree: r.makeAction<any>("leavetree"),
       reparent: r.makeAction<any>("reparent"),
       watch: r.makeAction<any, any>("watch", {
@@ -379,6 +393,8 @@ export class Session {
     if (member) {
       this.synced.add(id);
       this.act.sum.send(summarize(this.events.values()), { target: id });
+      const t = this.isAdmin() ? this.ctx.turnToShare() : null;
+      if (t) this.act.turn.send(t, { target: id });
     } else if (this.isMember()) {
       this.act.gate.send({ pending: true }, { target: id });
     }
@@ -486,6 +502,12 @@ export class Session {
       }
     }
     this.ctx.emit();
+  }
+
+  /** Repassa as credenciais temporárias do TURN aos membros conectados (quem administra o servidor). */
+  shareTurn() {
+    const t = this.isAdmin() ? this.ctx.turnToShare() : null;
+    if (t) this.toMembers((ids) => this.act.turn.send(t, { target: ids }));
   }
 
   broadcastState(p: PresencePatch) {

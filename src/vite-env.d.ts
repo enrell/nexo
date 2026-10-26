@@ -24,6 +24,8 @@ interface Window {
     portMap: (ip: string, port: number) => Promise<{ ip: string; port: number } | null>;
     portMapRelease: (port: number) => Promise<void>;
     portMapStatus: () => Promise<NexoPortMapStatus>;
+    /** credenciais temporárias do TURN da Cloudflare (o token fica no processo principal) */
+    cfTurn: (keyId: string, token: string) => Promise<{ ok: true; iceServers: RTCIceServer[]; ttl: number } | { ok: false; error: string }>;
     installUpdate: () => Promise<void>;
     checkUpdate: () => Promise<void>;
     setConfig: (c: { closeToTray: boolean; launchAtLogin: boolean; keyMute: string; keyDeafen: string; pttKey: string; zoom: number }) => void;

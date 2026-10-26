@@ -5,6 +5,7 @@ const https = require("node:https");
 const net = require("node:net");
 const path = require("node:path");
 const { safeLookup } = require("./netguard.cjs");
+const cfturn = require("./cfturn.cjs");
 const { createPortMapper } = require("./portmap.cjs");
 const { parsePreview } = require("./preview.cjs");
 const { setupUpdater } = require("./updater.cjs");
@@ -397,6 +398,7 @@ app.whenReady().then(() => {
   handle("nexo:portmap", (ip, port) => portMapper.map(String(ip), Number(port)));
   handle("nexo:portmap-release", (port) => portMapper.release(Number(port)));
   handle("nexo:portmap-status", () => portMapper.status());
+  handle("nexo:cfturn", (keyId, token) => cfturn.generate(keyId, token));
   ipcMain.on("nexo:debug", (e) => {
     // ganchos de teste/depuração só fora do app instalado
     e.returnValue = trusted(e) && !app.isPackaged;

@@ -111,6 +111,9 @@ export const defaultSettings: Settings = {
   turnPass: "",
   relayUrls: "",
   portMap: true,
+  cfTurnKeyId: "",
+  cfTurnToken: "",
+  cfTurnShare: true,
   closeToTray: true,
   launchAtLogin: false,
   // seguro por padrão: nada que vaze seu IP para sites de terceiros sem você pedir

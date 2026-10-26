@@ -22,6 +22,7 @@ contextBridge.exposeInMainWorld("nexo", {
   portMap: (ip, port) => ipcRenderer.invoke("nexo:portmap", ip, port),
   portMapRelease: (port) => ipcRenderer.invoke("nexo:portmap-release", port),
   portMapStatus: () => ipcRenderer.invoke("nexo:portmap-status"),
+  cfTurn: (keyId, token) => ipcRenderer.invoke("nexo:cfturn", keyId, token),
   installUpdate: () => ipcRenderer.invoke("nexo:install-update"),
   checkUpdate: () => ipcRenderer.invoke("nexo:check-update"),
   setConfig: (c) => ipcRenderer.send("nexo:config", c),

@@ -65,6 +65,11 @@ export type Settings = {
   relayUrls: string; // um por linha; vazio = padrão
   /** abrir portas no roteador (UPnP/NAT-PMP) para amigos atrás de CGNAT chegarem direto */
   portMap: boolean;
+  /** TURN da Cloudflare: "Turn Token ID" e "API token" de uma chave TURN do usuário */
+  cfTurnKeyId: string;
+  cfTurnToken: string;
+  /** repassar credenciais temporárias (nunca o token) aos membros dos servidores que você administra */
+  cfTurnShare: boolean;
   // sistema
   closeToTray: boolean;
   launchAtLogin: boolean;

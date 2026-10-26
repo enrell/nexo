@@ -406,10 +406,10 @@ function PrivacySection() {
       />
       <Toggle
         label="Esconder meu IP dos outros (só via TURN)"
-        hint={st.turnUrl ? "Todo o tráfego passa pelo seu servidor TURN; os amigos não veem seu IP. Reinicie o app para aplicar." : "Precisa de um servidor TURN configurado em Rede."}
-        checked={st.relayOnly && !!st.turnUrl}
+        hint={st.turnUrl || st.cfTurnKeyId ? "Todo o tráfego passa pelo seu servidor TURN; os amigos não veem seu IP. Reinicie o app para aplicar." : "Precisa de um servidor TURN configurado em Rede."}
+        checked={st.relayOnly && (!!st.turnUrl || !!st.cfTurnKeyId)}
         onChange={(v) => {
-          if (st.turnUrl) set({ relayOnly: v });
+          if (st.turnUrl || st.cfTurnKeyId) set({ relayOnly: v });
         }}
       />
       <Toggle
@@ -764,7 +764,9 @@ function NetworkSection() {
       />
       {st.portMap && <PortMapStatus />}
 
-      <h3>TURN (avançado)</h3>
+      <CloudflareTurn />
+
+      <h3>Outro servidor TURN (avançado)</h3>
       <p className="dim small">Se algum amigo nunca conecta (NAT restritivo, alguns 4G/CGNAT), um servidor TURN repassa o tráfego. Um amigo pode hospedar um coturn, ou use um serviço gratuito.</p>
       <Field label="URLs do TURN, uma por linha" hint="Em CGNAT agressivo o UDP costuma ser bloqueado: inclua também as variantes TCP e turns: na porta 443.">
         <textarea rows={3} value={turnDraft.turnUrl} placeholder={"turn:meuturn.exemplo.com:3478\nturn:meuturn.exemplo.com:3478?transport=tcp\nturns:meuturn.exemplo.com:443?transport=tcp"} onChange={(e) => setTurnDraft({ ...turnDraft, turnUrl: e.target.value })} />
@@ -800,6 +802,84 @@ function NetworkSection() {
       >
         Salvar e reiniciar
       </button>
+    </>
+  );
+}
+
+function CloudflareTurn() {
+  const a = useApp();
+  const st = a.settings;
+  const cf = a.cfTurn;
+  const [keyId, setKeyId] = useState("");
+  const [token, setToken] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [test, setTest] = useState("");
+  const connected = !!st.cfTurnKeyId && !!cf.own;
+  const hours = cf.own ? Math.max(0, Math.round((cf.own.exp - Date.now()) / 3600_000)) : 0;
+
+  const connect = async () => {
+    setErr(null);
+    const e = await a.connectCfTurn(keyId, token);
+    if (e) return setErr(e);
+    setKeyId("");
+    setToken("");
+    setTest("…");
+    setTest((await testTurn(a.extraIce())).detail);
+  };
+
+  return (
+    <>
+      <h3>TURN da Cloudflare</h3>
+      <p className="dim small">Resolve CGNAT dos dois lados: quando não dá para conectar direto, o tráfego passa pela Cloudflare (cifrado de ponta a ponta, ela não vê o conteúdo). Grátis até 1 TB por mês. Só você precisa configurar: o Nexo repassa acesso temporário aos membros dos servidores que você administra.</p>
+      {connected ? (
+        <>
+          <p className="small">✅ Conectado. As credenciais renovam sozinhas (valem mais {hours} h).</p>
+          <div className="row center">
+            <button
+              className="btn ghost"
+              disabled={test === "…"}
+              onClick={async () => {
+                setTest("…");
+                setTest((await testTurn(a.extraIce())).detail);
+              }}
+            >
+              {test === "…" ? "Testando…" : "Testar"}
+            </button>
+            <button className="btn ghost" onClick={() => (a.disconnectCfTurn(), setTest(""))}>
+              Desconectar
+            </button>
+            {test && test !== "…" && <span className="dim small">{test}</span>}
+          </div>
+          <Toggle label="Compartilhar com os membros dos meus servidores" hint="Vai só um acesso temporário (48 h), nunca o seu token. Só servidores onde você é dono ou admin." checked={st.cfTurnShare} onChange={(v) => a.setSettings({ ...st, cfTurnShare: v })} />
+        </>
+      ) : (
+        <>
+          {!st.cfTurnKeyId && cf.shared && cf.shared.exp > Date.now() && <p className="small">✅ Usando o TURN compartilhado por {cf.shared.from}. Não precisa fazer nada.</p>}
+          {st.cfTurnKeyId && cf.error && <p className="small error-text">{cf.error}</p>}
+          <ol className="small steps">
+            <li>
+              Abra o painel da Cloudflare (crie uma conta grátis, se não tiver).{" "}
+              <button className="btn small ghost" onClick={() => window.open("https://dash.cloudflare.com/?to=/:account/calls")}>
+                Abrir Cloudflare
+              </button>
+            </li>
+            <li>
+              Em <b>Realtime → TURN Server</b>, clique em <b>Create</b> e dê um nome qualquer (ex.: Nexo).
+            </li>
+            <li>
+              Copie a <b>Turn Token ID</b> e o <b>API token</b> e cole aqui:
+            </li>
+          </ol>
+          <div className="row">
+            <input value={keyId} placeholder="Turn Token ID" spellCheck={false} onChange={(e) => (setKeyId(e.target.value), setErr(null))} />
+            <input value={token} placeholder="API token" type="password" spellCheck={false} onChange={(e) => (setToken(e.target.value), setErr(null))} onKeyDown={(e) => e.key === "Enter" && keyId && token && void connect()} />
+            <button className="btn" disabled={!keyId.trim() || !token.trim() || cf.busy} onClick={connect}>
+              {cf.busy ? "Conectando…" : "Conectar"}
+            </button>
+          </div>
+          {err && <p className="small error-text">{err}</p>}
+        </>
+      )}
     </>
   );
 }
@@ -840,7 +920,7 @@ function AboutSection() {
       version,
       date: new Date().toISOString(),
       platform: navigator.userAgent,
-      settings: { ...a.settings, turnPass: a.settings.turnPass ? "***" : "" },
+      settings: { ...a.settings, turnPass: a.settings.turnPass ? "***" : "", cfTurnToken: a.settings.cfTurnToken ? "***" : "" },
       servers: [...a.sessions.values()].map((s) => ({
         name: s.name,
         peers: Object.values(s.peers).map((p) => ({ rtt: p.rtt, relayed: p.relayed, live: !!p.live, voice: !!p.inVoice })),

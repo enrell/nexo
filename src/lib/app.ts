@@ -2,10 +2,11 @@ import { useSyncExternalStore } from "react";
 import { AudioEngine } from "./audio";
 import { db } from "./db";
 import { Identity, openBackup } from "./identity";
-import { initCertificate, mediaErrorMessage, testOverrideFingerprint } from "./rtc";
+import { initCertificate, mediaErrorMessage, refreshExtraIce, testOverrideFingerprint } from "./rtc";
 import { Session } from "./session";
 import { decodeInvite, defaultSettings, flushSecureStore, initSecureStore, randomId, storage } from "./storage";
 import { applyTheme } from "./theme";
+import type { SharedTurn } from "./turn";
 import { initVault } from "./vault";
 import type { MsgView, Profile, ServerInfo, Settings, Status } from "./types";
 
@@ -86,6 +87,8 @@ class App {
     if (p) {
       this.profile = { ...p, userId: this.identity.pub, status: p.status ?? "online", relaySlots: p.relaySlots ?? 2 };
       storage.saveProfile(this.profile);
+      // com TURN da Cloudflare configurado, as primeiras conexões já saem com ele (sem segurar a abertura)
+      await Promise.race([this.refreshCfTurn(), new Promise((r) => setTimeout(r, 3000))]);
       this.connectAll();
     }
     this.activeRoom = this.servers[0]?.roomId ?? null;
@@ -234,6 +237,9 @@ class App {
         if (kind === "live-start" && !dnd && (this.session === s || s.inVoice)) this.audio.play("liveOther");
       },
       onMove: (s, roomId, password) => this.moveServer(s, roomId, password),
+      extraIce: () => this.extraIce(),
+      turnToShare: () => this.turnToShare(),
+      onSharedTurn: (_s, from, t) => this.onSharedTurn(from, t),
     });
     this.sessions.set(server.sid, session);
   }
@@ -349,6 +355,75 @@ class App {
   setStatus(status: Status) {
     if (!this.profile) return;
     this.setProfile({ ...this.profile, status });
+  }
+
+  // ---------------------------------------------------------------- TURN da Cloudflare
+
+  /** own: gerado com a sua chave; shared: repassado por um admin de algum servidor */
+  cfTurn: { own: SharedTurn | null; shared: (SharedTurn & { from: string }) | null; error: string | null; busy: boolean } = { own: null, shared: null, error: null, busy: false };
+  private cfTimer: number | undefined;
+
+  extraIce(): RTCIceServer[] {
+    const now = Date.now() + 60_000;
+    const { own, shared } = this.cfTurn;
+    if (own && own.exp > now) return own.servers;
+    if (shared && shared.exp > now) return shared.servers;
+    return [];
+  }
+
+  private turnToShare(): SharedTurn | null {
+    const own = this.cfTurn.own;
+    return this.settings.cfTurnShare && own && own.exp > Date.now() + 60_000 ? own : null;
+  }
+
+  private onSharedTurn(from: string, t: SharedTurn) {
+    const cur = this.cfTurn.shared;
+    if (cur && cur.exp >= t.exp) return;
+    this.cfTurn.shared = { ...t, from };
+    if (!this.cfTurn.own) refreshExtraIce(this.extraIce());
+    this.emit();
+  }
+
+  /** Gera (ou renova) as credenciais com a chave salva. Devolve a mensagem de erro, se houver. */
+  async refreshCfTurn(): Promise<string | null> {
+    clearTimeout(this.cfTimer);
+    const { cfTurnKeyId: keyId, cfTurnToken: token } = this.settings;
+    if (!keyId || !token || !window.nexo?.cfTurn) {
+      this.cfTurn = { ...this.cfTurn, own: null, error: null, busy: false };
+      refreshExtraIce(this.extraIce());
+      this.emit();
+      return null;
+    }
+    this.cfTurn = { ...this.cfTurn, busy: true };
+    this.emit();
+    const r = await window.nexo.cfTurn(keyId, token).catch(() => ({ ok: false as const, error: "Não consegui falar com a Cloudflare." }));
+    if (keyId !== this.settings.cfTurnKeyId || token !== this.settings.cfTurnToken) return null; // trocaram a chave no meio
+    if (!r.ok) {
+      this.cfTurn = { ...this.cfTurn, error: r.error, busy: false };
+      this.cfTimer = window.setTimeout(() => void this.refreshCfTurn(), 10 * 60_000);
+      this.emit();
+      return r.error;
+    }
+    this.cfTurn = { ...this.cfTurn, own: { servers: r.iceServers, exp: Date.now() + r.ttl * 1000 }, error: null, busy: false };
+    // valem 48 h: renova bem antes, e as conexões abertas recebem as novas
+    this.cfTimer = window.setTimeout(() => void this.refreshCfTurn(), 12 * 3600_000);
+    refreshExtraIce(this.extraIce());
+    this.sessions.forEach((s) => s.shareTurn());
+    this.emit();
+    return null;
+  }
+
+  /** "Conectar" na tela de Rede: salva a chave e já gera as credenciais. */
+  async connectCfTurn(keyId: string, token: string): Promise<string | null> {
+    this.setSettings({ ...this.settings, cfTurnKeyId: keyId.trim(), cfTurnToken: token.trim() });
+    const err = await this.refreshCfTurn();
+    if (err) this.setSettings({ ...this.settings, cfTurnKeyId: "", cfTurnToken: "" });
+    return err;
+  }
+
+  disconnectCfTurn() {
+    this.setSettings({ ...this.settings, cfTurnKeyId: "", cfTurnToken: "" });
+    void this.refreshCfTurn();
   }
 
   setSettings(s: Settings) {

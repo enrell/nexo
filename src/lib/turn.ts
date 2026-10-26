@@ -29,6 +29,28 @@ export function joinErrorMessage(error: string, hasTurn: boolean): string {
   return error;
 }
 
+/** Credenciais temporárias do TURN da Cloudflare, com validade (ms desde 1970). */
+export type SharedTurn = { servers: RTCIceServer[]; exp: number };
+
+export const CF_TURN_MAX_MS = 48 * 3600 * 1000;
+const CF_TURN_URL = /^turns?:turn\.cloudflare\.com:(\d{1,5})(?:\?transport=(?:udp|tcp))?$/;
+const secret = (s: unknown): s is string => typeof s === "string" && s.length >= 8 && s.length <= 512 && /^[\x21-\x7e]+$/.test(s);
+
+/**
+ * TURN que um admin repassou pela rede. Só aceita turn.cloudflare.com: um membro mal-intencionado
+ * não consegue mandar todo mundo usar um TURN dele (que veria IPs e poderia derrubar as conexões).
+ */
+export function sanitizeSharedTurn(raw: unknown, now = Date.now()): SharedTurn | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as { servers?: unknown; exp?: unknown };
+  if (typeof r.exp !== "number" || !Number.isFinite(r.exp) || r.exp <= now || r.exp > now + CF_TURN_MAX_MS + 60_000) return null;
+  const s = Array.isArray(r.servers) && r.servers.length === 1 ? (r.servers[0] as { urls?: unknown; username?: unknown; credential?: unknown }) : null;
+  if (!s || !Array.isArray(s.urls) || s.urls.length < 1 || s.urls.length > 16 || !secret(s.username) || !secret(s.credential)) return null;
+  const urls = s.urls.filter((u): u is string => typeof u === "string" && CF_TURN_URL.test(u) && !u.includes(":53?") && !u.endsWith(":53"));
+  if (urls.length !== s.urls.length) return null;
+  return { servers: [{ urls, username: s.username, credential: s.credential }], exp: r.exp };
+}
+
 export type TurnTestResult = { ok: boolean; detail: string };
 
 /**
