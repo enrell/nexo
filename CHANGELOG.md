@@ -6,6 +6,15 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+## [0.6.0] - 2026-10-25
+
+### Adicionado
+- TURN aceita várias URLs (uma por linha): dá para colocar UDP, TCP e `turns:` na porta 443 juntos, que é o que passa em CGNAT agressivo e 4G que bloqueiam UDP.
+- Botão "Testar TURN" em Configurações → Rede: diz se o servidor respondeu ou se recusou usuário/senha.
+
+### Corrigido
+- "could not connect to peer… configure TURN servers" virou uma mensagem em português dizendo o que fazer, e some sozinha quando alguém conecta, em vez de ficar travada no topo do canal.
+
 ## [0.5.0] - 2026-10-23
 
 ### Adicionado
@@ -100,7 +109,8 @@ Primeira versão pública. Tudo criptografado e seguro por padrão.
 ### Adicionado
 - Demonstração inicial: chat, voz e live P2P com interface parecida com a do Discord.
 
-[Não lançado]: https://github.com/enrell/nexo/compare/v0.5.0...HEAD
+[Não lançado]: https://github.com/enrell/nexo/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/enrell/nexo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/enrell/nexo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/enrell/nexo/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/enrell/nexo/releases/tag/v0.3.0
