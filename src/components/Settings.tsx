@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { COLORS, resetLocalData, useApp } from "../lib/app";
 import { openBackup, storeRestoredIdentity } from "../lib/identity";
+import type { UiSound } from "../lib/audio";
 import { logs } from "../lib/logs";
 import { mediaErrorMessage } from "../lib/rtc";
 import { buildTurnConfig, testTurn } from "../lib/turn";
@@ -109,10 +110,16 @@ export function SettingsScreen({ onClose }: { onClose: () => void }) {
           </Field>
           <Toggle label="Notificações do Windows" hint="Mostra um aviso quando chega mensagem com o Nexo em segundo plano." checked={st.notifyDesktop} onChange={(v) => set({ notifyDesktop: v })} />
           <Toggle label="Som de mensagem" checked={st.notifySounds} onChange={(v) => set({ notifySounds: v })} />
-          <Toggle label="Sons da interface" hint="Entrar/sair da voz, mutar, desmutar." checked={st.uiSounds} onChange={(v) => set({ uiSounds: v })} />
-          <button className="btn ghost" onClick={() => a.audio.play("mention")}>
-            Testar som
-          </button>
+          <Toggle label="Sons da interface" hint="Voz, mudo e surdo, lives (a sua e a dos amigos), espectadores, pedidos de entrada." checked={st.uiSounds} onChange={(v) => set({ uiSounds: v })} />
+          <Field label="Ouvir os sons">
+            <div className="chips">
+              {SOUND_PREVIEW.map(([k, label]) => (
+                <button key={k} className="chip" onClick={() => a.audio.play(k)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </Field>
           <p className="dim small">Status “Não perturbe” silencia todas as notificações. Servidores e canais podem ser silenciados no clique direito.</p>
         </>
       ),
@@ -670,6 +677,23 @@ function StreamSection() {
     </>
   );
 }
+
+const SOUND_PREVIEW: [UiSound, string][] = [
+  ["message", "Mensagem"],
+  ["mention", "Menção"],
+  ["join", "Entrou na voz"],
+  ["leave", "Saiu da voz"],
+  ["mute", "Mudo"],
+  ["unmute", "Com som"],
+  ["deafen", "Surdo"],
+  ["undeafen", "Ouvindo"],
+  ["live", "Você ao vivo"],
+  ["liveEnd", "Live encerrada"],
+  ["liveOther", "Amigo ao vivo"],
+  ["viewer", "Novo espectador"],
+  ["knock", "Pedido de entrada"],
+  ["approved", "Aprovado"],
+];
 
 function NetworkSection() {
   const a = useApp();

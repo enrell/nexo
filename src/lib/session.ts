@@ -58,7 +58,7 @@ export type SessionCtx = {
   emit: () => void;
   onNewMessage: (session: Session, msg: MsgView) => void;
   onVoiceStream: (session: Session, peerId: string, pub: string, stream: MediaStream | null) => void;
-  onPeerEvent: (session: Session, kind: "voice-join" | "voice-leave" | "live-start", peerId: string) => void;
+  onPeerEvent: (session: Session, kind: "voice-join" | "voice-leave" | "live-start" | "viewer-join" | "knock" | "approved" | "live-end", peerId: string) => void;
   onMove: (session: Session, roomId: string, password: string) => void;
   saveServers: () => void;
 };
@@ -282,7 +282,10 @@ export class Session {
       this.joinError = "Você foi banido deste servidor.";
       this.joinErrorTransient = false;
     }
-    if (this.awaitingApproval && isMemberOf(st, this.server.owner, this.me) && st.approval) this.awaitingApproval = false;
+    if (this.awaitingApproval && isMemberOf(st, this.server.owner, this.me) && st.approval) {
+      this.awaitingApproval = false;
+      this.ctx.onPeerEvent(this, "approved", "");
+    }
     // quem acabou de ser aprovado recebe nosso estado completo
     if (this.loaded) for (const id of Object.keys(this.peers)) if (!this.synced.has(id) && this.isMember(this.peers[id].pub)) this.greet(id);
     this.ctx.emit();
@@ -405,7 +408,10 @@ export class Session {
   private onHello(peerId: string, h: Hello) {
     const p = this.peers[peerId];
     if (!p || !h?.profile) return;
+    const first = !p.profile;
     p.profile = sanitizeProfile(h.profile, p.pub); // vale a chave provada no handshake
+    // alguém novo batendo na porta: só quem pode aprovar ouve
+    if (first && this.isAdmin() && !this.isMember(p.pub) && !this.state.banned.has(p.pub)) this.ctx.onPeerEvent(this, "knock", peerId);
     this.rememberMember(p.pub, p.profile);
     if (this.isMember(p.pub) || !this.isMember()) {
       p.live = sanitizeLive(h.live);
@@ -918,6 +924,7 @@ export class Session {
 
   stopLive() {
     if (!this.myStream) return;
+    this.ctx.onPeerEvent(this, "live-end", "");
     clearInterval(this.thumbTimer);
     this.room.removeStream(this.myStream);
     this.myStream.getTracks().forEach((t) => t.stop());
@@ -964,6 +971,8 @@ export class Session {
 
   private handleWatch(viewer: string, failed?: string): WatchReply {
     if (!this.myStream) return { ok: false, reason: "Essa live já acabou." };
+    // reconexão (failed) ou quem já estava assistindo não conta como espectador novo
+    if (!failed && !this.tree.has(viewer)) this.ctx.onPeerEvent(this, "viewer-join", viewer);
     this.tree.delete(viewer);
     if (failed && this.tree.get(failed)) this.tree.delete(failed);
 

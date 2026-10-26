@@ -6,6 +6,18 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+### Adicionado
+- Convite em link https (`https://enrell.github.io/nexo/c/#…`): fica clicável no Discord, WhatsApp e em qualquer app, abre o Nexo e oferece o download para quem ainda não tem. O código vai depois do "#", que nem o GitHub nem a prévia do Discord recebem.
+- Abre portas no roteador automaticamente (UPnP/NAT-PMP, como o qBittorrent): amigos atrás de CGNAT conseguem conectar direto em você. Configurações → Rede mostra se funcionou ou se o seu roteador também está atrás de CGNAT.
+- Conexões diretas por IPv6 aparecem como "direta (IPv6)" em Configurações → Rede.
+- Sons novos: sua live acabou, um amigo entrou ao vivo, alguém começou a assistir a sua live, pedido de entrada no servidor, você foi aprovado, e um som próprio para o surdo. Dá para ouvir cada um em Configurações → Notificações.
+
+### Alterado
+- Transmitir: telas e janelas em abas separadas (Telas, Janelas, Câmera); cada aba lembra a sua escolha.
+
+### Corrigido
+- O botão "Painel" da gaveta aparecia também com a janela larga, ao lado do "Recolher painel", e não fazia nada.
+
 ## [0.6.0] - 2026-10-25
 
 ### Adicionado

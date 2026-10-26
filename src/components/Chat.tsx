@@ -132,7 +132,7 @@ export function ChatView({ s, compact }: { s: Session; compact?: boolean }) {
             <SidebarSimple size={19} weight="duotone" />
           </button>
           {a.settings.ctxCollapsed && (
-            <button className="ibtn" data-tip="Mostrar painel" aria-label="Mostrar painel" onClick={() => a.toggleCtx()}>
+            <button className="ibtn wide-only" data-tip="Mostrar painel" aria-label="Mostrar painel" onClick={() => a.toggleCtx()}>
               <SidebarSimple size={19} weight="duotone" />
             </button>
           )}

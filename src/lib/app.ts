@@ -222,9 +222,16 @@ class App {
         if (stream) this.audio.addRemote(key, pub, stream);
         else this.audio.removeRemote(key);
       },
-      onPeerEvent: (_s, kind) => {
+      onPeerEvent: (s, kind) => {
+        const dnd = this.profile?.status === "dnd";
         if (kind === "voice-join") this.audio.play("join");
         if (kind === "voice-leave") this.audio.play("leave");
+        if (kind === "live-end") this.audio.play("liveEnd");
+        if (kind === "viewer-join") this.audio.play("viewer");
+        if (kind === "knock") this.audio.play("knock");
+        if (kind === "approved") this.audio.play("approved");
+        // live de um amigo: só do servidor aberto ou de onde você está na voz (senão vira barulho)
+        if (kind === "live-start" && !dnd && (this.session === s || s.inVoice)) this.audio.play("liveOther");
       },
       onMove: (s, roomId, password) => this.moveServer(s, roomId, password),
     });
@@ -607,7 +614,7 @@ class App {
   setDeafened(d: boolean) {
     this.deafened = d;
     if (!d) this.audio.setDeafened(false);
-    this.audio.play(d ? "mute" : "unmute");
+    this.audio.play(d ? "deafen" : "undeafen");
     if (d) this.audio.setDeafened(true);
     this.sessions.forEach((s) => s.inVoice && s.broadcastState({ deaf: d }));
     this.emit();

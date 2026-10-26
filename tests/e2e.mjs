@@ -337,6 +337,15 @@ try {
     if (!out.samePub) throw new Error("backup não restaura a mesma identidade");
   });
 
+  await step("um só botão de painel visível (larga: recolher; estreita: gaveta)", async () => {
+    const vis = await A.ev(() =>
+      [...document.querySelectorAll('button[aria-label="Painel"], button[aria-label="Mostrar painel"], button[aria-label="Recolher painel"]')]
+        .filter((b) => b.getClientRects().length > 0)
+        .map((b) => b.getAttribute("aria-label")),
+    );
+    if (vis.length !== 1) throw new Error("botões de painel visíveis: " + (vis.join(", ") || "nenhum"));
+  });
+
   await step("configurações e busca global (Ctrl+K) funcionam", async () => {
     await A.page.locator(".you .ibtn").last().click(); // menu ⋯
     await A.page.getByRole("menuitem", { name: "Configurações" }).click();

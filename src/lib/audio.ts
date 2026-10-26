@@ -335,43 +335,17 @@ export class AudioEngine {
 
   // ---------------------------------------------------------------- sons da interface
 
-  play(kind: "join" | "leave" | "mute" | "unmute" | "message" | "mention" | "live") {
+  play(kind: UiSound) {
     if (!this.settings().uiSounds && kind !== "message" && kind !== "mention") return;
     const ctx = this.ensureCtx();
-    const seq: Record<typeof kind, [number, number][]> = {
-      join: [
-        [523, 0],
-        [784, 0.09],
-      ],
-      leave: [
-        [784, 0],
-        [523, 0.09],
-      ],
-      mute: [[392, 0]],
-      unmute: [[659, 0]],
-      message: [
-        [880, 0],
-        [1175, 0.06],
-      ],
-      mention: [
-        [988, 0],
-        [1319, 0.08],
-        [988, 0.16],
-      ],
-      live: [
-        [659, 0],
-        [880, 0.08],
-        [1047, 0.16],
-      ],
-    };
     const t0 = ctx.currentTime + 0.01;
-    for (const [f, dt] of seq[kind]) {
+    for (const [f, dt, vol = 0.12] of SOUNDS[kind]) {
       const o = ctx.createOscillator();
       const g = ctx.createGain();
       o.type = "sine";
       o.frequency.value = f;
       g.gain.setValueAtTime(0, t0 + dt);
-      g.gain.linearRampToValueAtTime(0.12, t0 + dt + 0.01);
+      g.gain.linearRampToValueAtTime(vol, t0 + dt + 0.01);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.18);
       o.connect(g);
       g.connect(this.master!);
@@ -380,3 +354,29 @@ export class AudioEngine {
     }
   }
 }
+
+export type UiSound = keyof typeof SOUNDS;
+
+/** Sons da interface: [frequência Hz, início s, volume]. Mesma voz senoidal curta para tudo; sobe = algo começou, desce = terminou. */
+export const SOUNDS = {
+  join: [[523, 0], [784, 0.09]],
+  leave: [[784, 0], [523, 0.09]],
+  mute: [[392, 0]],
+  unmute: [[659, 0]],
+  // surdo: mais grave e com duas notas, para não confundir com o mudo
+  deafen: [[392, 0], [262, 0.08]],
+  undeafen: [[392, 0], [659, 0.08]],
+  message: [[880, 0], [1175, 0.06]],
+  mention: [[988, 0], [1319, 0.08], [988, 0.16]],
+  // você ficou ao vivo / sua live acabou
+  live: [[659, 0], [880, 0.08], [1047, 0.16]],
+  liveEnd: [[1047, 0], [880, 0.08], [659, 0.16]],
+  // um amigo começou uma live
+  liveOther: [[784, 0], [1047, 0.07], [1568, 0.14, 0.06]],
+  // alguém começou a assistir a sua live (discreto: pode acontecer várias vezes)
+  viewer: [[1319, 0, 0.06], [1568, 0.05, 0.05]],
+  // alguém pedindo para entrar no servidor: "toc toc"
+  knock: [[330, 0, 0.16], [330, 0.13, 0.16]],
+  // você foi aprovado
+  approved: [[523, 0], [659, 0.08], [784, 0.16], [1047, 0.24]],
+} satisfies Record<string, readonly (readonly [number, number] | readonly [number, number, number])[]>;

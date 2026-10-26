@@ -35,6 +35,9 @@ import {
   Trash,
   UsersThree,
   X,
+  AppWindow,
+  Monitor,
+  VideoCamera,
 } from "@phosphor-icons/react";
 import type { Status } from "../lib/types";
 
@@ -159,6 +162,9 @@ export const Icons = {
   HeadsetOff: mk(SpeakerSlash, "duotone"),
   Gear: mk(GearSix, "duotone"),
   Screen: mk(Screencast, "duotone"),
+  Monitor: mk(Monitor, "duotone"),
+  Window: mk(AppWindow, "duotone"),
+  Camera: mk(VideoCamera, "duotone"),
   Hangup: mk(PhoneX, "fill"),
   Plus: mk(Plus, "bold"),
   Chevron: mk(CaretDown, "bold"),

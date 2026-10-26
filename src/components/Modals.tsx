@@ -322,10 +322,11 @@ export function PromptModal(props: { title: string; label: string; initial?: str
 
 export function GoLiveModal({ s, onClose, initialKind = "screen" }: { s: Session; onClose: () => void; initialKind?: "screen" | "camera" }) {
   const a = useApp();
-  const [kind, setKind] = useState<"screen" | "camera">(initialKind);
+  // telas e janelas em abas separadas: misturadas, a tela inteira se perde no meio dos apps
+  const [tab, setTab] = useState<"screens" | "windows" | "camera">(initialKind === "camera" ? "camera" : "screens");
+  const kind: "screen" | "camera" = tab === "camera" ? "camera" : "screen";
   const [sources, setSources] = useState<NexoSource[] | null>(null);
-  const [sel, setSel] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "screens" | "windows">("all");
+  const [selByTab, setSelByTab] = useState<{ screens: string | null; windows: string | null }>({ screens: null, windows: null });
   const [audio, setAudio] = useState(true);
   const [title, setTitle] = useState(() => storage.get<string>("livetitle", ""));
   const [busy, setBusy] = useState(false);
@@ -337,7 +338,14 @@ export function GoLiveModal({ s, onClose, initialKind = "screen" }: { s: Session
       window.nexo!.getSources().then((list) => {
         if (!alive) return;
         setSources(list);
-        setSel((cur) => cur ?? list[0]?.id ?? null);
+        // cada aba lembra a escolha; se a escolhida sumiu (janela fechada), cai para a primeira
+        setSelByTab((cur) => {
+          const pick = (screen: boolean, id: string | null) => {
+            const of = list.filter((x) => x.isScreen === screen);
+            return of.some((x) => x.id === id) ? id : (of[0]?.id ?? null);
+          };
+          return { screens: pick(true, cur.screens), windows: pick(false, cur.windows) };
+        });
       });
     load();
     const t = setInterval(load, 4000);
@@ -347,7 +355,9 @@ export function GoLiveModal({ s, onClose, initialKind = "screen" }: { s: Session
     };
   }, []);
 
-  const shown = (sources ?? []).filter((x) => filter === "all" || (filter === "screens" ? x.isScreen : !x.isScreen));
+  const shown = (sources ?? []).filter((x) => (tab === "screens" ? x.isScreen : !x.isScreen));
+  const sel = tab === "camera" ? null : selByTab[tab];
+  const setSel = (id: string) => tab !== "camera" && setSelByTab((cur) => ({ ...cur, [tab]: id }));
   const preset = a.settings.preset;
 
   const go = async () => {
@@ -381,33 +391,25 @@ export function GoLiveModal({ s, onClose, initialKind = "screen" }: { s: Session
         </>
       }
     >
-      <div className="tabs">
-        <button className={kind === "screen" ? "on" : ""} onClick={() => setKind("screen")}>
-          <Icons.Screen size={16} /> Tela / Janela
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "screens"} className={tab === "screens" ? "on" : ""} onClick={() => setTab("screens")}>
+          <Icons.Monitor size={16} /> Telas
         </button>
-        <button className={kind === "camera" ? "on" : ""} onClick={() => setKind("camera")}>
-          📷 Câmera
+        <button role="tab" aria-selected={tab === "windows"} className={tab === "windows" ? "on" : ""} onClick={() => setTab("windows")}>
+          <Icons.Window size={16} /> Janelas
+        </button>
+        <button role="tab" aria-selected={tab === "camera"} className={tab === "camera" ? "on" : ""} onClick={() => setTab("camera")}>
+          <Icons.Camera size={16} /> Câmera
         </button>
       </div>
       {kind === "screen" && (
         <>
-          <div className="chips">
-            {(
-              [
-                ["all", "Tudo"],
-                ["windows", "Aplicativos"],
-                ["screens", "Telas inteiras"],
-              ] as const
-            ).map(([v, l]) => (
-              <button key={v} className={"chip" + (filter === v ? " on" : "")} onClick={() => setFilter(v)}>
-                {l}
-              </button>
-            ))}
-          </div>
           {sources === null ? (
-            <div className="dim">Carregando telas…</div>
+            <div className="dim">Carregando {tab === "screens" ? "telas" : "janelas"}…</div>
           ) : sources.length === 0 ? (
             <div className="dim">O sistema vai perguntar qual tela compartilhar.</div>
+          ) : shown.length === 0 ? (
+            <div className="dim">{tab === "screens" ? "Nenhuma tela encontrada." : "Nenhuma janela aberta para transmitir."}</div>
           ) : (
             <div className="sources">
               {shown.map((src) => (
@@ -415,7 +417,6 @@ export function GoLiveModal({ s, onClose, initialKind = "screen" }: { s: Session
                   <img src={src.thumbnail} alt="" />
                   <span className="ellipsis">
                     {src.icon && <img className="src-icon" src={src.icon} alt="" />}
-                    {src.isScreen ? "🖥 " : ""}
                     {src.name}
                   </span>
                 </button>
