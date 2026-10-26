@@ -169,8 +169,8 @@ describe("convites", () => {
 
   it("o link de convite é https (clicável no Discord/WhatsApp) e o código vai só no fragmento", () => {
     const link = inviteLink(srv);
-    expect(link).toBe("https://enrell.github.io/nexo/c#" + encodeInvite(srv));
-    expect(new URL(link).pathname).toBe("/nexo/c");
+    expect(link).toBe("https://enrell.github.io/nexo/c/#" + encodeInvite(srv));
+    expect(new URL(link).pathname).toBe("/nexo/c/");
     expect(decodeInvite(link)).toEqual(decodeInvite(encodeInvite(srv)));
     expect(decodeInvite("nexo://join/" + encodeInvite(srv))?.roomId).toBe(srv.roomId);
   });

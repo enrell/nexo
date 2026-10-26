@@ -227,7 +227,7 @@ export function AddServerModal({ onClose, initialTab = "create" }: { onClose: ()
         <>
           <label className="field">
             <span>Link ou código de convite</span>
-            <textarea autoFocus rows={3} value={code} placeholder="https://enrell.github.io/nexo/c#nexo-... ou nexo-..." onChange={(e) => (setCode(e.target.value), setErr(null))} />
+            <textarea autoFocus rows={3} value={code} placeholder="https://enrell.github.io/nexo/c/#nexo-... ou nexo-..." onChange={(e) => (setCode(e.target.value), setErr(null))} />
           </label>
           {preview && (
             <div className="invite-preview">
