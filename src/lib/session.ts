@@ -18,6 +18,7 @@ import { canonical, GOVERNANCE, MAX_FUTURE_MS, validateBody, verifyEvent } from 
 import { isPubKey, sha256, verify, type Identity } from "./identity";
 import { sanitizeLive, sanitizePatch, sanitizeProfile, sanitizeThumb, type PresencePatch } from "./sanitize";
 import { makePeerConnectionClass, myFingerprint, remoteFingerprint } from "./rtc";
+import { buildTurnConfig, joinErrorMessage } from "./turn";
 import { randomId } from "./storage";
 import type { Attachment, EventBody, LiveInfo, Member, MsgView, PeerInfo, Profile, ServerInfo, Settings, SignedEvent, StoredEvent, WatchState } from "./types";
 
@@ -83,6 +84,7 @@ export class Session {
   members: Record<string, Member> = {};
   loaded = false;
   joinError: string | null = null;
+  private joinErrorTransient = false;
   // canal -> pub -> expira. Sem protótipo: o nome do canal vem da rede e "constructor" não pode ser um canal
   typing: Record<string, Record<string, number>> = Object.create(null);
   blobsLoading = new Set<string>();
@@ -123,7 +125,7 @@ export class Session {
     private ctx: SessionCtx,
   ) {
     const s = ctx.settings();
-    const turnConfig = s.turnUrl ? [{ urls: s.turnUrl, username: s.turnUser || undefined, credential: s.turnPass || undefined }] : undefined;
+    const turnConfig = buildTurnConfig(s);
     const urls = s.relayUrls
       .split(/\s+/)
       .map((u) => u.trim())
@@ -135,13 +137,15 @@ export class Session {
         password: server.password,
         turnConfig,
         relayConfig: urls.length ? { urls } : { redundancy: 6 },
-        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && !!s.turnUrl),
+        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && !!turnConfig),
         maxReceiveBytes: 32 * 1024 * 1024,
       },
       server.roomId,
       {
         onJoinError: (e) => {
-          this.joinError = /banid/i.test(e.error) ? "Você foi banido deste servidor." : e.error;
+          this.joinError = joinErrorMessage(e.error, !!turnConfig);
+          // falha com UM amigo não é fatal: some quando alguém conectar
+          this.joinErrorTransient = !/banid/i.test(e.error);
           ctx.emit();
         },
         onPeerHandshake: (peerId, send, receive) => this.handshake(peerId, send, receive),
@@ -274,7 +278,10 @@ export class Session {
         this.onPeerLeave(id);
       }
     }
-    if (st.banned.has(this.me)) this.joinError = "Você foi banido deste servidor.";
+    if (st.banned.has(this.me)) {
+      this.joinError = "Você foi banido deste servidor.";
+      this.joinErrorTransient = false;
+    }
     if (this.awaitingApproval && isMemberOf(st, this.server.owner, this.me) && st.approval) this.awaitingApproval = false;
     // quem acabou de ser aprovado recebe nosso estado completo
     if (this.loaded) for (const id of Object.keys(this.peers)) if (!this.synced.has(id) && this.isMember(this.peers[id].pub)) this.greet(id);
@@ -378,6 +385,10 @@ export class Session {
     const info = this.handshakeInfo[id];
     delete this.handshakeInfo[id];
     if (!info) return;
+    if (this.joinErrorTransient) {
+      this.joinError = null;
+      this.joinErrorTransient = false;
+    }
     // channel binding: o certificado DTLS desta conexão tem que ser o que foi assinado
     const pc = this.room.getPeers()[id];
     const fp = pc ? remoteFingerprint(pc) : null;

@@ -3,6 +3,7 @@ import { COLORS, resetLocalData, useApp } from "../lib/app";
 import { openBackup, storeRestoredIdentity } from "../lib/identity";
 import { logs } from "../lib/logs";
 import { mediaErrorMessage } from "../lib/rtc";
+import { buildTurnConfig, testTurn } from "../lib/turn";
 import type { Session } from "../lib/session";
 import { PRESETS, encodeInvite, flushSecureStore, inviteLink, storage } from "../lib/storage";
 import type { Codec, Quality, Settings, StreamPreset } from "../lib/types";
@@ -678,6 +679,7 @@ function NetworkSection() {
   const [relay, setRelay] = useState(p.relaySlots);
   const [turnDraft, setTurnDraft] = useState({ turnUrl: st.turnUrl, turnUser: st.turnUser, turnPass: st.turnPass, relayUrls: st.relayUrls });
   const [testing, setTesting] = useState(false);
+  const [turnTest, setTurnTest] = useState("");
   const [up, setUp] = useState<number | null>(null);
 
   const speedTest = async () => {
@@ -731,12 +733,27 @@ function NetworkSection() {
 
       <h3>TURN (avançado)</h3>
       <p className="dim small">Se algum amigo nunca conecta (NAT restritivo, alguns 4G/CGNAT), um servidor TURN repassa o tráfego. Um amigo pode hospedar um coturn, ou use um serviço gratuito.</p>
-      <Field label="URL do TURN">
-        <input value={turnDraft.turnUrl} placeholder="turn:meuturn.exemplo.com:3478" onChange={(e) => setTurnDraft({ ...turnDraft, turnUrl: e.target.value })} />
+      <Field label="URLs do TURN, uma por linha" hint="Em CGNAT agressivo o UDP costuma ser bloqueado: inclua também as variantes TCP e turns: na porta 443.">
+        <textarea rows={3} value={turnDraft.turnUrl} placeholder={"turn:meuturn.exemplo.com:3478\nturn:meuturn.exemplo.com:3478?transport=tcp\nturns:meuturn.exemplo.com:443?transport=tcp"} onChange={(e) => setTurnDraft({ ...turnDraft, turnUrl: e.target.value })} />
       </Field>
       <div className="row">
         <input value={turnDraft.turnUser} placeholder="usuário" onChange={(e) => setTurnDraft({ ...turnDraft, turnUser: e.target.value })} />
         <input value={turnDraft.turnPass} placeholder="senha" type="password" onChange={(e) => setTurnDraft({ ...turnDraft, turnPass: e.target.value })} />
+      </div>
+      <div className="row center">
+        <button
+          className="btn ghost"
+          disabled={turnTest === "…"}
+          onClick={async () => {
+            const cfg = buildTurnConfig(turnDraft);
+            if (!cfg) return setTurnTest("Nenhuma URL válida (comece com turn: ou turns:).");
+            setTurnTest("…");
+            setTurnTest((await testTurn(cfg)).detail);
+          }}
+        >
+          {turnTest === "…" ? "Testando…" : "Testar TURN"}
+        </button>
+        {turnTest && turnTest !== "…" && <span className="dim small">{turnTest}</span>}
       </div>
       <Field label="Relays de descoberta (Nostr), um por linha" hint="Vazio = lista pública padrão (recomendado).">
         <textarea rows={3} value={turnDraft.relayUrls} placeholder="wss://relay.exemplo.com" onChange={(e) => setTurnDraft({ ...turnDraft, relayUrls: e.target.value })} />

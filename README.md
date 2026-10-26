@@ -89,7 +89,7 @@ Releases saem **só pelo GitHub Actions**, a partir de uma tag `vX.Y.Z`: o pipel
 
 ## Limitações conhecidas
 
-- **NAT restritivo** (alguns 4G/CGNAT): se dois amigos nessa situação não conectarem, configure um TURN em *Configurações → Rede*.
+- **NAT restritivo** (alguns 4G/CGNAT): se dois amigos nessa situação não conectarem, configure um TURN em *Configurações → Rede* (coloque também as URLs `?transport=tcp` e `turns:` na porta 443, que passam quando a operadora bloqueia UDP) e use *Testar TURN* para conferir.
 - **Convite renovado**: quem estava offline na hora precisa do convite novo.
 - **Histórico**: só existe nos PCs dos membros. Se ninguém que tem uma mensagem estiver online, quem entrar não a recebe até alguém aparecer.
 - **Áudio do PC na live** (Windows): captura tudo o que toca. O Nexo pede ao Chromium para excluir o próprio áudio (voz dos amigos), mas, se ela aparecer, transmita uma janela em vez da tela inteira ou use fone.
