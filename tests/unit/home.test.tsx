@@ -94,7 +94,7 @@ describe("página inicial com servidores: serve para chamar amigos", () => {
     show();
     const [first] = host.querySelectorAll(".home-card");
     await act(async () => [...first.querySelectorAll("button")].find((b) => b.textContent?.includes("Copiar link"))!.click());
-    expect(writeText).toHaveBeenCalledWith("nexo://join/" + encodeInvite(srv(1)));
+    expect(writeText).toHaveBeenCalledWith("https://enrell.github.io/nexo/c/#" + encodeInvite(srv(1)));
     expect(app.showToast).toHaveBeenCalledWith(expect.stringContaining("Servidor 1"));
   });
 
@@ -105,11 +105,11 @@ describe("página inicial com servidores: serve para chamar amigos", () => {
     expect(app.showToast).toHaveBeenCalledWith(expect.stringContaining("Não consegui copiar"), "error");
   });
 
-  it("'Convite' abre o link e o código para colar em apps que não clicam em nexo://", () => {
+  it("'Convite' abre o link https (clicável em qualquer app) e o código para colar", () => {
     show();
     act(() => button("Convite")!.click());
     const dialog = host.querySelector('[role="dialog"]')!;
-    expect(dialog.textContent).toContain("nexo://join/");
+    expect(dialog.textContent).toContain("https://enrell.github.io/nexo/c/#nexo-");
     expect(dialog.textContent).toContain("Servidor 1");
   });
 
