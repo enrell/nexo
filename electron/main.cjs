@@ -97,6 +97,8 @@ function createWindow() {
   win.once("ready-to-show", () => win.show());
 
   const openExternal = (url) => {
+    // convite clicado dentro do próprio Nexo: entra direto, sem passar pelo navegador
+    if (/^https:\/\/enrell\.github\.io\/nexo\/c\/?#nexo-[A-Za-z0-9_-]+$/.test(url)) return send("nexo:open-url", url);
     // só http(s); nada de file:, javascript:, ms-settings: etc.
     if (/^https?:\/\//i.test(url)) shell.openExternal(url);
   };

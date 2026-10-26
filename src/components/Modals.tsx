@@ -227,7 +227,7 @@ export function AddServerModal({ onClose, initialTab = "create" }: { onClose: ()
         <>
           <label className="field">
             <span>Link ou código de convite</span>
-            <textarea autoFocus rows={3} value={code} placeholder="nexo://join/nexo-... ou nexo-..." onChange={(e) => (setCode(e.target.value), setErr(null))} />
+            <textarea autoFocus rows={3} value={code} placeholder="https://enrell.github.io/nexo/c#nexo-... ou nexo-..." onChange={(e) => (setCode(e.target.value), setErr(null))} />
           </label>
           {preview && (
             <div className="invite-preview">
@@ -268,7 +268,7 @@ export function InviteModal({ s, onClose }: { s: Session; onClose: () => void })
     <Modal title={`Convidar amigos para ${s.name}`} onClose={onClose}>
       <p className="dim">Quem tiver o convite entra — trate como uma senha. Se vazar, um administrador pode renová-lo nas configurações do servidor.</p>
       <div className="field">
-        <span>Link (abre o Nexo direto)</span>
+        <span>Link (funciona no Discord, WhatsApp e em qualquer app: abre o Nexo)</span>
         <div className="invite-box">
           <code>{link}</code>
           <button className="btn" onClick={() => copy("link")}>
@@ -285,7 +285,7 @@ export function InviteModal({ s, onClose }: { s: Session; onClose: () => void })
           </button>
         </div>
       </div>
-      <p className="dim small">Alguns apps (WhatsApp, Discord) não deixam clicar em links nexo://. Nesse caso, a pessoa copia e cola o código no Nexo.</p>
+      <p className="dim small">O código fica depois do “#” do link: nem o GitHub nem a prévia do Discord recebem essa parte. Quem ainda não tem o Nexo vê o botão para baixar.</p>
     </Modal>
   );
 }

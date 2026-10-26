@@ -169,7 +169,12 @@ export function encodeInvite(s: ServerInfo): string {
   return "nexo-" + b64;
 }
 
-export const inviteLink = (s: ServerInfo) => "nexo://join/" + encodeInvite(s);
+/**
+ * Página que abre o Nexo a partir de um link https (Discord, WhatsApp etc. só deixam clicar em
+ * http/https). O código vai depois do "#", que o navegador nunca envia a servidor nenhum.
+ */
+export const INVITE_PAGE = "https://enrell.github.io/nexo/c";
+export const inviteLink = (s: ServerInfo) => INVITE_PAGE + "#" + encodeInvite(s);
 
 export type Invite = { name: string; roomId: string; password: string; owner: string; sid: string };
 
