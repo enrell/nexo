@@ -135,7 +135,7 @@ describe("chamada HTTPS à API", () => {
   });
 
   it("resposta gigante é cortada; erro de rede e timeout viram null", async () => {
-    let f = fakeHttps((req, cb) => {
+    let f = fakeHttps((_req, cb) => {
       const res = Object.assign(new EventEmitter(), { statusCode: 200 });
       cb(res);
       res.emit("data", Buffer.alloc(70 * 1024));
