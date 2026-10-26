@@ -6,6 +6,8 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+## [0.7.0] - 2026-10-26
+
 ### Adicionado
 - Convite em link https (`https://enrell.github.io/nexo/c/#…`): fica clicável no Discord, WhatsApp e em qualquer app, abre o Nexo e oferece o download para quem ainda não tem. O código vai depois do "#", que nem o GitHub nem a prévia do Discord recebem.
 - Abre portas no roteador automaticamente (UPnP/NAT-PMP, como o qBittorrent): amigos atrás de CGNAT conseguem conectar direto em você. Configurações → Rede mostra se funcionou ou se o seu roteador também está atrás de CGNAT.
@@ -121,7 +123,8 @@ Primeira versão pública. Tudo criptografado e seguro por padrão.
 ### Adicionado
 - Demonstração inicial: chat, voz e live P2P com interface parecida com a do Discord.
 
-[Não lançado]: https://github.com/enrell/nexo/compare/v0.6.0...HEAD
+[Não lançado]: https://github.com/enrell/nexo/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/enrell/nexo/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/enrell/nexo/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/enrell/nexo/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/enrell/nexo/compare/v0.3.0...v0.4.0
