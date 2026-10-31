@@ -1,4 +1,5 @@
 # Nexo
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/1a229b18-5238-4579-8352-83de8e7a5a36" />
 
 Chat de texto, voz e lives entre amigos, com cara de Discord e **sem servidor central**. Tudo criptografado e seguro por padrão — veja [SECURITY.md](SECURITY.md).
 
