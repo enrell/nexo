@@ -600,6 +600,16 @@ function VoiceSection() {
       />
       <Toggle label="Cancelamento de eco" hint="Evita que os outros se ouçam de volta se você usa caixa de som." checked={st.echoCancellation} onChange={(v) => set({ echoCancellation: v })} />
       <Toggle label="Ganho automático" hint="Equilibra o volume da sua voz." checked={st.autoGain} onChange={(v) => set({ autoGain: v })} />
+      <Toggle
+        label="Áudio cifrado com SFrame (experimental)"
+        hint={
+          st.e2eeMedia && !a.e2ee
+            ? "Vale ao reabrir o Nexo. Se continuar assim depois de reabrir, este Nexo não tem suporte (falta o RTCRtpScriptTransform do Chromium)."
+            : "Cifra cada quadro de áudio com uma chave sua, entregue só aos membros. Só vale com quem também ligou, e ao reabrir o Nexo. A voz já é cifrada na conexão; isto prepara a mídia para passar por um repassador sem que ele ouça."
+        }
+        checked={st.e2eeMedia}
+        onChange={(v) => set({ e2eeMedia: v })}
+      />
 
       <h3>Câmera</h3>
       <Field label="Câmera (para lives de câmera)">

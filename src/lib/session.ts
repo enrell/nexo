@@ -16,6 +16,8 @@ import { db } from "./db";
 import { derive, dayKey, isMemberOf, summarize, type Derived } from "./derive";
 import { canonical, GOVERNANCE, MAX_FUTURE_MS, validateBody, verifyEvent } from "./events";
 import { isPubKey, sha256, verify, type Identity } from "./identity";
+import type { MediaE2ee } from "./e2ee";
+import { mayShareMediaKey } from "./mediakeys";
 import { sanitizeLive, sanitizePatch, sanitizeProfile, sanitizeThumb, type PresencePatch } from "./sanitize";
 import { makePeerConnectionClass, myFingerprint, remoteFingerprint } from "./rtc";
 import { buildTurnConfig, joinErrorMessage, sanitizeSharedTurn, type SharedTurn } from "./turn";
@@ -66,9 +68,11 @@ export type SessionCtx = {
   /** credenciais temporárias para repassar aos membros (só se você gerou e quer compartilhar) */
   turnToShare: () => SharedTurn | null;
   onSharedTurn: (session: Session, fromName: string, t: SharedTurn) => void;
+  /** SFrame no áudio (experimental); `null` = desligado ou sem suporte */
+  e2ee?: MediaE2ee | null;
 };
 
-type Hello = { profile: Profile; live: LiveInfo | null; inVoice: boolean; muted: boolean; deaf: boolean; thumb?: string };
+type Hello = { profile: Profile; live: LiveInfo | null; inVoice: boolean; muted: boolean; deaf: boolean; thumb?: string; sf?: 1 };
 type WatchReply = { ok: true } | { ok: false; reason: string } | { redirect: string };
 type MediaMeta = { kind: "live" | "voice"; origin?: string };
 export type LiveStats = { res: string; fps: number; kbps: number; codec: string; loss: number };
@@ -101,6 +105,10 @@ export class Session {
   private buckets: Record<string, { ev: Bucket; small: Bucket; blob: Bucket }> = {};
   /** um membro nos avisou que ainda precisamos ser aprovados */
   awaitingApproval = false;
+  /** SFrame: KID da minha chave que cada peer já recebeu, e de quem tenho chave (para esquecer ao banir) */
+  private keySent = new Map<string, number>();
+  private keyTo = new Set<string>();
+  private keyFrom = new Set<string>();
 
   // live (transmissor)
   myStream: MediaStream | null = null;
@@ -142,7 +150,7 @@ export class Session {
         password: server.password,
         turnConfig,
         relayConfig: urls.length ? { urls } : { redundancy: 6 },
-        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && (!!turnConfig || !!s.cfTurnKeyId), () => ctx.settings().portMap, ctx.extraIce),
+        rtcPolyfill: makePeerConnectionClass(() => ctx.settings().codec, s.relayOnly && (!!turnConfig || !!s.cfTurnKeyId), () => ctx.settings().portMap, ctx.extraIce, ctx.e2ee?.hooks ?? null),
         maxReceiveBytes: 32 * 1024 * 1024,
       },
       server.roomId,
@@ -201,6 +209,14 @@ export class Session {
       const t = sanitizeSharedTurn(raw);
       if (t) ctx.onSharedTurn(this, this.profileOf(p.pub).name, t);
     };
+    // chave de mídia (SFrame): só de quem é membro, e só se nós também somos
+    this.act.mkey.onMessage = (raw: unknown, { peerId }) => {
+      if (!this.allow(peerId, "small", true)) return;
+      const p = this.peers[peerId];
+      if (!p || !this.ctx.e2ee || !this.mayShareKey(p)) return;
+      this.ctx.e2ee.accept(p.pub, raw);
+      this.keyFrom.add(p.pub);
+    };
     this.act.leaveTree.onMessage = (_: unknown, { peerId }) => {
       if (this.allow(peerId, "small", true)) void this.onLeaveTree(peerId);
     };
@@ -229,6 +245,7 @@ export class Session {
       typing: r.makeAction<any>("typing"),
       gate: r.makeAction<any>("gate"),
       turn: r.makeAction<any>("turn"),
+      mkey: r.makeAction<any>("mkey"),
       leaveTree: r.makeAction<any>("leavetree"),
       reparent: r.makeAction<any>("reparent"),
       watch: r.makeAction<any, any>("watch", {
@@ -284,6 +301,7 @@ export class Session {
       setTimeout(() => this.ctx.onMove(this, r, p), 1500);
     }
     // todo membro aplica o banimento: derruba a conexão com quem foi banido
+    if (st.banned.size && this.ctx.e2ee) this.dropBannedKeys(st.banned);
     if (st.banned.size) {
       const pcs = this.room.getPeers();
       for (const [id, p] of Object.entries(this.peers)) {
@@ -319,6 +337,52 @@ export class Session {
     if (pub === this.me && this.awaitingApproval) return false;
     return isMemberOf(this.state, this.server.owner, pub);
   }
+  // ------------------------------------------------------------------ SFrame (experimental)
+
+  private mayShareKey(p: PeerInfo) {
+    return mayShareMediaKey({ member: this.isMember() }, { member: this.isMember(p.pub), sf: p.sf });
+  }
+
+  /** Manda a minha chave de envio a um membro que também ligou o SFrame (uma vez por chave). */
+  private offerMediaKey(id: string) {
+    const e = this.ctx.e2ee;
+    const p = this.peers[id];
+    if (!e || !p || !this.mayShareKey(p) || this.keySent.get(id) === e.kid) return;
+    this.keySent.set(id, e.kid);
+    this.keyTo.add(p.pub);
+    this.act.mkey.send(e.offer(), { target: id });
+  }
+
+  /** Depois de trocar a chave (em qualquer servidor): entrega a nova a todos os membros conectados. */
+  offerMediaKeys() {
+    for (const id of Object.keys(this.peers)) this.offerMediaKey(id);
+  }
+
+  /** Banido: esquece a chave dele e, se ele tinha a minha, troca a minha. */
+  private dropBannedKeys(banned: Set<string>) {
+    let rotate = false;
+    for (const pub of banned) {
+      if (this.keyFrom.delete(pub)) this.ctx.e2ee!.forget(pub);
+      if (this.keyTo.delete(pub)) rotate = true;
+    }
+    if (rotate) this.ctx.e2ee!.rotate();
+  }
+
+  /** Esta pessoa me entregou a chave dela como membro deste servidor. */
+  hasKeyFrom(pub: string) {
+    return this.keyFrom.has(pub);
+  }
+
+  /** Quem está do outro lado desta conexão (para o SFrame escolher a chave). */
+  peerByConnection(pc: RTCPeerConnection): { pub: string; sf: boolean } | null {
+    for (const [id, c] of Object.entries(this.room.getPeers())) {
+      if (c !== pc) continue;
+      const p = this.peers[id];
+      return p ? { pub: p.pub, sf: !!p.sf } : null;
+    }
+    return null;
+  }
+
   /** Peers conectados que são membros (os únicos que recebem conteúdo). */
   memberPeers(): string[] {
     return Object.entries(this.peers)
@@ -378,7 +442,7 @@ export class Session {
   // ------------------------------------------------------------------ peers
 
   private hello(full: boolean): Hello {
-    const base: Hello = { profile: this.ctx.profile(), live: null, inVoice: false, muted: false, deaf: false };
+    const base: Hello = { profile: this.ctx.profile(), live: null, inVoice: false, muted: false, deaf: false, ...(this.ctx.e2ee ? { sf: 1 as const } : {}) };
     if (!full) return base; // pendentes só veem nome e foto
     return { ...base, live: this.myLive, inVoice: this.inVoice, muted: this.ctx.muted(), deaf: this.ctx.deaf(), thumb: this.myThumb };
   }
@@ -393,6 +457,7 @@ export class Session {
     if (member) {
       this.synced.add(id);
       this.act.sum.send(summarize(this.events.values()), { target: id });
+      this.offerMediaKey(id);
       const t = this.isAdmin() ? this.ctx.turnToShare() : null;
       if (t) this.act.turn.send(t, { target: id });
     } else if (this.isMember()) {
@@ -426,6 +491,7 @@ export class Session {
     if (!p || !h?.profile) return;
     const first = !p.profile;
     p.profile = sanitizeProfile(h.profile, p.pub); // vale a chave provada no handshake
+    p.sf = h.sf === 1;
     // alguém novo batendo na porta: só quem pode aprovar ouve
     if (first && this.isAdmin() && !this.isMember(p.pub) && !this.state.banned.has(p.pub)) this.ctx.onPeerEvent(this, "knock", peerId);
     this.rememberMember(p.pub, p.profile);
@@ -438,6 +504,7 @@ export class Session {
       p.inVoice = !!h.inVoice;
       if (p.inVoice && !wasVoice && this.inVoice) this.sendMic(peerId);
     }
+    this.offerMediaKey(peerId);
     this.ctx.emit();
   }
 
@@ -453,6 +520,7 @@ export class Session {
     delete this.handshakeInfo[id];
     delete this.buckets[id];
     this.synced.delete(id);
+    this.keySent.delete(id);
     if (p?.pub) {
       const m = this.members[p.pub];
       if (m) db.putMember({ ...m, lastSeen: Date.now() }).catch(() => {});

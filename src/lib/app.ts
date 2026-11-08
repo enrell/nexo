@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { AudioEngine } from "./audio";
 import { db } from "./db";
+import { MediaE2ee } from "./e2ee";
 import { Identity, openBackup } from "./identity";
 import { initCertificate, mediaErrorMessage, refreshExtraIce, testOverrideFingerprint } from "./rtc";
 import { Session } from "./session";
@@ -51,6 +52,8 @@ class App {
   pendingInvite: string | null = null;
   update: NexoUpdate | null = null;
   audio: AudioEngine;
+  /** SFrame no áudio (experimental): só existe se ligado nas configurações ao abrir o app e se o Chromium suporta */
+  e2ee: MediaE2ee | null = null;
 
   private version = 0;
   private listeners = new Set<() => void>();
@@ -76,6 +79,7 @@ class App {
       this.audio.loadPrefs();
       this.identity = await Identity.load();
       await initCertificate();
+      this.initE2ee();
     } catch (e) {
       console.error(e);
       this.fatal = e instanceof Error ? e.message : String(e);
@@ -205,6 +209,27 @@ class App {
 
   // ---------------------------------------------------------------- sessões
 
+  private initE2ee() {
+    if (!this.settings.e2eeMedia) return;
+    try {
+      this.e2ee = MediaE2ee.create();
+    } catch (e) {
+      console.warn("sframe: worker não abriu; seguindo sem", e);
+    }
+    if (!this.e2ee) return;
+    this.e2ee.peerOf = (pc) => {
+      for (const s of this.sessions.values()) {
+        const p = s.peerByConnection(pc);
+        if (p) return p;
+      }
+      return null;
+    };
+    this.e2ee.onRotate = () => {
+      for (const s of this.sessions.values()) s.offerMediaKeys();
+    };
+    this.e2ee.heldElsewhere = (pub) => [...this.sessions.values()].some((s) => s.hasKeyFrom(pub));
+  }
+
   private connectAll() {
     for (const s of this.servers) this.connect(s);
   }
@@ -240,6 +265,7 @@ class App {
       extraIce: () => this.extraIce(),
       turnToShare: () => this.turnToShare(),
       onSharedTurn: (_s, from, t) => this.onSharedTurn(from, t),
+      e2ee: this.e2ee,
     });
     this.sessions.set(server.sid, session);
   }

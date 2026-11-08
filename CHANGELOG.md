@@ -6,6 +6,9 @@ Categorias: **Adicionado**, **Alterado**, **Obsoleto**, **Removido**, **Corrigid
 
 ## [Não lançado]
 
+### Adicionado
+- Experimental, desligado por padrão: áudio cifrado de ponta a ponta com SFrame (RFC 9605), em Configurações → Voz e vídeo. Só vale entre quem também ligou, e as chaves vão só para membros. Hoje não muda a proteção (a voz já é cifrada na conexão); prepara a mídia para passar por um repassador sem que ele ouça. Detalhes em `docs/fusao-laira.md`.
+
 ## [0.8.0] - 2026-10-26
 
 ### Adicionado

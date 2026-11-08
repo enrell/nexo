@@ -30,6 +30,8 @@ export type Settings = {
   noiseSuppression: boolean;
   echoCancellation: boolean;
   autoGain: boolean;
+  /** experimental: cifrar o áudio de ponta a ponta com SFrame (RFC 9605) entre quem também ligou. Vale ao reabrir o app. */
+  e2eeMedia: boolean;
   // transmissão
   preset: StreamPreset;
   quality: Quality;
@@ -151,6 +153,8 @@ export type PeerInfo = {
   relayed?: boolean;
   /** conexão direta por IPv6 (passa por cima do CGNAT, que só existe no IPv4) */
   ipv6?: boolean;
+  /** anunciou SFrame (áudio cifrado ponta a ponta, experimental) */
+  sf?: boolean;
 };
 
 export type WatchState = {

@@ -1,3 +1,4 @@
+import type { MediaHooks } from "./e2ee";
 import type { Codec } from "./types";
 
 const MIME: Record<Exclude<Codec, "auto">, string> = {
@@ -80,7 +81,13 @@ export function refreshExtraIce(extra: RTCIceServer[]) {
   }
 }
 
-export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolean, usePortMap: () => boolean = () => false, extraIce: () => RTCIceServer[] = () => []): typeof RTCPeerConnection {
+export function makePeerConnectionClass(
+  getCodec: () => Codec,
+  relayOnly: boolean,
+  usePortMap: () => boolean = () => false,
+  extraIce: () => RTCIceServer[] = () => [],
+  media: MediaHooks | null = null,
+): typeof RTCPeerConnection {
   return class NexoPeerConnection extends RTCPeerConnection {
     private mappedPorts = new Set<number>();
     private synthetic = new WeakSet<RTCIceCandidate>();
@@ -100,6 +107,9 @@ export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolea
       // atrás de CGNAT conseguir chegar direto em nós
       if (!relayOnly) this.addEventListener("icecandidate", (ev) => void this.announceMapped(ev.candidate));
       this.addEventListener("connectionstatechange", () => this.connectionState === "closed" && this.forget());
+      // SFrame (experimental): o transform do receptor tem que entrar durante o evento "track", antes do
+      // primeiro quadro; este ouvinte é registrado antes do `ontrack` do Trystero, então roda primeiro
+      if (media) this.addEventListener("track", (ev) => media.receiver(this, ev));
       this.baseIce = config?.iceServers ?? [];
       livePcs.add(this);
     }
@@ -135,6 +145,7 @@ export function makePeerConnectionClass(getCodec: () => Codec, relayOnly: boolea
 
     addTrack(track: MediaStreamTrack, ...streams: MediaStream[]): RTCRtpSender {
       const sender = super.addTrack(track, ...streams);
+      media?.sender(this, sender, track);
       if (track.kind === "video") {
         try {
           const tr = this.getTransceivers().find((t) => t.sender === sender);

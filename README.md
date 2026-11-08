@@ -107,4 +107,5 @@ Releases saem **só pelo GitHub Actions**, a partir de uma tag `vX.Y.Z`: o pipel
 - `src/lib/app.ts`: estado global (servidores, perfil, configurações, notificações)
 - `src/components/`: interface
 - `src/lib/events.ts`, `src/lib/sanitize.ts`: tudo que chega da rede (eventos, presença, perfil) é validado aqui antes de ser guardado ou desenhado
+- `src/lib/sframe.ts`, `mediakeys.ts`, `sframe-transform.ts`, `e2ee.ts`: áudio cifrado com SFrame (experimental, desligado; ver [`docs/fusao-laira.md`](docs/fusao-laira.md))
 - `tests/unit/`: testes unitários; `tests/e2e.mjs`: teste ponta a ponta

@@ -67,6 +67,7 @@ Só a **última versão** recebe correções de segurança. O app se atualiza so
 - **Chave de atualização**: quem controlar o workflow de release (push de tags ou edição do workflow) também usa a chave. Se ela vazar, publique uma versão que passe a aceitar uma chave nova (`PUBLIC_KEYS` em `electron/updatesig.cjs` aceita várias) e aposente a antiga; se for perdida, quem já instalou precisa reinstalar à mão.
 - **Código não assinado pela Microsoft** (ainda): o Windows SmartScreen avisa na primeira instalação (baixada pelo navegador). As atualizações automáticas são baixadas pelo próprio app e não passam por esse aviso. Confira o `SHA256SUMS` e o atestado de procedência da release (`gh attestation verify Nexo-Setup-X.Y.Z.exe -R enrell/nexo`).
 - O áudio do PC numa live pode incluir o som de outros apps; transmita uma janela específica para evitar.
+- **Áudio cifrado com SFrame** (experimental, desligado por padrão): no P2P de hoje não acrescenta proteção, porque todo salto já é um membro e já é DTLS-SRTP. Ele prepara a mídia para passar por quem não é membro (ver `docs/fusao-laira.md`). A chave de envio é uma só para todos os servidores na mesma execução, e vídeo ainda não é cifrado assim. Como em todo SFrame com chave por remetente, um membro que tem a sua chave conseguiria forjar quadros seus se tivesse por onde injetá-los.
 
 ## Inventário criptográfico
 
@@ -81,6 +82,7 @@ Só a **última versão** recebe correções de segurança. O app se atualiza so
 | Backup da conta | PBKDF2-SHA256 (600.000 iterações, sal de 128 bits) + AES-256-GCM |
 | Número de segurança | SHA-256 iterado 1024× sobre as duas chaves públicas ordenadas |
 | Convite | ID de sala (100 bits) + senha (120 bits) + dono + ID do servidor |
+| Áudio por quadro (experimental, desligado) | SFrame (RFC 9605), AES_128_GCM_SHA256_128; chave de envio aleatória de 128 bits por pessoa e por execução, entregue só a membros pelo canal DTLS autenticado |
 
 ## Processo de desenvolvimento
 

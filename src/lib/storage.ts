@@ -83,6 +83,7 @@ export const defaultSettings: Settings = {
   noiseSuppression: true,
   echoCancellation: true,
   autoGain: true,
+  e2eeMedia: false,
   preset: "medium",
   quality: "1080p30",
   bitrate: 4000,
