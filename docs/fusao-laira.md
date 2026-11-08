@@ -78,7 +78,7 @@ Arquivos: `src/lib/sframe.ts` (RFC 9605), `src/lib/mediakeys.ts` (chave de envio
 
 ## E o repositório do laira
 
-Proposta: o laira **continua como está até a decisão do passo 3**. É a referência do SFU, da sinalização, do failover, da captura nativa e dos testes de interoperabilidade. Antes disso, vale corrigir no README a frase "SFrame (RFC 9605)" (ou implementar o RFC lá, com os vetores daqui). Se o SFU entrar no Nexo, o laira é **arquivado** (somente leitura), com o README apontando para cá, e a captura nativa fica lá como referência para o passo 4. Se o SFU não entrar, o laira segue como projeto próprio de streaming de jogo no Linux, sem pretensão de ser o motor do Nexo.
+O laira foi apagado em 08/11/2026: o Nexo o substitui. Fica uma cópia do histórico fora do GitHub, como referência para o SFU (passo 3) e para a captura nativa (passo 4), se um dia vierem. O que já veio para cá, a camada SFrame conforme o RFC 9605 e os vetores de teste, é o código que vale daqui em diante.
 
 ## Perguntas em aberto
 
